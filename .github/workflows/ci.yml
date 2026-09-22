@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   VALHEIM_APPID: "896660"
@@ -27,6 +27,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
@@ -118,3 +120,46 @@ jobs:
           path: |
             Qmod/bin/Release/net48/Qmod.dll
             Qmod/Qmod.zip
+
+      - name: Publish GitHub release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version=$(jq -r '.version_number' Qmod/Package/manifest.json)
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "version_number invalide dans le manifeste: $version" >&2
+            exit 1
+          fi
+          tag="v${version}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists, skipping."
+            exit 0
+          fi
+          prev=$(git tag -l 'v*' --sort=-v:refname | grep -v -x "$tag" | head -n 1 || true)
+          {
+            echo "Qmod ${version}."
+            echo
+            echo "\`Qmod-${version}.zip\` est le paquet Thunderstore (manifest, icône, README, plugins/Qmod.dll)."
+            echo
+            if [ -n "$prev" ]; then
+              echo "Changements depuis ${prev} :"
+            else
+              echo "Commits :"
+            fi
+            echo
+            if [ -n "$prev" ]; then
+              git log --pretty=format:'- %s' "${prev}..HEAD"
+            else
+              git log --pretty=format:'- %s'
+            fi
+            echo
+          } > /tmp/release-notes.md
+          cp Qmod/Qmod.zip "Qmod-${version}.zip"
+          gh release create "$tag" \
+            "Qmod-${version}.zip" \
+            Qmod/bin/Release/net48/Qmod.dll \
+            --target "$GITHUB_SHA" \
+            --title "Qmod ${version}" \
+            --notes-file /tmp/release-notes.md
