@@ -18,6 +18,7 @@ namespace Qmod
         private const string Build = "08. Construction";
         private const string Mounts = "09. Montures";
         private const string Debug = "10. Debug";
+        private const string Ranges = "11. Rayons";
 
         internal static ConfigEntry<bool> SupersamplingEnabled;
         internal static ConfigEntry<float> SupersamplingScale;
@@ -86,6 +87,12 @@ namespace Qmod
 
         internal static ConfigEntry<string> DebugUnsynchronized;
 
+        internal static ConfigEntry<float> ComfortRadius;
+        internal static ConfigEntry<float> WorkbenchRadius;
+        internal static ConfigEntry<float> StonecutterRadius;
+        internal static ConfigEntry<float> ArtisanRadius;
+        internal static ConfigEntry<float> UpgradeRadius;
+
         private const string odintoken = "ODINISMYKING";
 
         // Seule la valeur odintoken débloque buisson magique, foudre et menu
@@ -115,6 +122,7 @@ namespace Qmod
             BindBuild(config);
             BindMounts(config);
             BindDebug(config);
+            BindRanges(config);
 
             ScrubOrphans(config);
         }
@@ -268,6 +276,25 @@ namespace Qmod
         {
             DebugUnsynchronized = config.Bind(Debug, "debugunsychronized", "NONONO",
                 "Paramètre technique interne. Laisser sur NONONO sauf indication.");
+        }
+
+        private static void BindRanges(ConfigFile config)
+        {
+            ComfortRadius = config.Bind(Ranges, "ComfortRadius", 0f,
+                new ConfigDescription("Rayon (m) de recherche des pièces de confort pour le bonus reposé. 0 = vanilla (10 m)",
+                    new AcceptableValueRange<float>(0f, 60f)));
+            WorkbenchRadius = config.Bind(Ranges, "WorkbenchRadius", 0f,
+                new ConfigDescription("Rayon de construction de l'établi. 0 = vanilla",
+                    new AcceptableValueRange<float>(0f, 150f)));
+            StonecutterRadius = config.Bind(Ranges, "StonecutterRadius", 0f,
+                new ConfigDescription("Rayon de construction du tailleur de pierre. 0 = vanilla",
+                    new AcceptableValueRange<float>(0f, 150f)));
+            ArtisanRadius = config.Bind(Ranges, "ArtisanRadius", 0f,
+                new ConfigDescription("Rayon de construction de la table d'artisan. 0 = vanilla",
+                    new AcceptableValueRange<float>(0f, 150f)));
+            UpgradeRadius = config.Bind(Ranges, "UpgradeRadius", 0f,
+                new ConfigDescription("Distance max des améliorations autour des stations (chaudrons, forge, établi, forge noire...). 0 = vanilla",
+                    new AcceptableValueRange<float>(0f, 150f)));
         }
 
         // BepInEx garde les anciennes sections (Graphics, 1. Nuage magique, etc.)
