@@ -74,7 +74,7 @@ namespace Qmod
                 return;
             }
 
-            if (!ModConfig.MagicBushEnabled.Value || !Util.CanAct(player))
+            if (!ModConfig.IsOdin() || !ModConfig.MagicBushEnabled.Value || !Util.CanAct(player))
             {
                 Dismount(grantSlowFall: false);
                 DestroyBush();
@@ -106,12 +106,18 @@ namespace Qmod
 
         private static void TrySummon()
         {
+            Player player = Player.m_localPlayer;
+            if (!ModConfig.IsOdin())
+            {
+                Util.NotifyPlayer(player, "Odin ne répond pas");
+                return;
+            }
+
             if (ModConfig.MagicBushEnabled == null || !ModConfig.MagicBushEnabled.Value)
             {
                 return;
             }
 
-            Player player = Player.m_localPlayer;
             if (!CanSummon(player))
             {
                 return;

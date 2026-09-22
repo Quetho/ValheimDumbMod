@@ -26,6 +26,12 @@ namespace Qmod
                 return;
             }
 
+            if (!ModConfig.IsOdin())
+            {
+                Util.NotifyPlayer(player, "Odin ne répond pas");
+                return;
+            }
+
             if (Time.unscaledTime < nextStrike)
             {
                 return;

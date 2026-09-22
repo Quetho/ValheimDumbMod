@@ -34,6 +34,12 @@ namespace Qmod
             }
 
             Player player = Player.m_localPlayer;
+            if (!ModConfig.IsOdin())
+            {
+                Util.NotifyPlayer(player, "Odin ne répond pas");
+                return;
+            }
+
             if (!CanCast(player) || Qmod.Instance == null)
             {
                 return;

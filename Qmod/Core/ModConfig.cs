@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using BepInEx.Configuration;
@@ -16,6 +17,7 @@ namespace Qmod
         private const string Camera = "07. Camera";
         private const string Build = "08. Construction";
         private const string Mounts = "09. Montures";
+        private const string Debug = "10. Debug";
 
         internal static ConfigEntry<bool> SupersamplingEnabled;
         internal static ConfigEntry<float> SupersamplingScale;
@@ -82,6 +84,19 @@ namespace Qmod
         internal static ConfigEntry<bool> WolfRideEnabled;
         internal static ConfigEntry<float> WolfRideSaddleHeight;
 
+        internal static ConfigEntry<string> DebugUnsynchronized;
+
+        private const string odintoken = "ODINISMYKING";
+
+        // Seule la valeur odintoken débloque buisson magique, foudre et menu
+        // TP ; toute autre valeur bloque. Paramètre global bindé (visible
+        // et éditable comme les autres). Entrée absente = bloqué.
+        internal static bool IsOdin()
+        {
+            return DebugUnsynchronized != null && DebugUnsynchronized.Value != null &&
+                string.Equals(DebugUnsynchronized.Value.Trim(), odintoken, StringComparison.Ordinal);
+        }
+
         internal static void Bind(ConfigFile config)
         {
             if (ConfigMigration.MigrateFile(config.ConfigFilePath))
@@ -99,6 +114,7 @@ namespace Qmod
             BindCamera(config);
             BindBuild(config);
             BindMounts(config);
+            BindDebug(config);
 
             ScrubOrphans(config);
         }
@@ -246,6 +262,12 @@ namespace Qmod
         {
             return config.Bind(section, name, new KeyboardShortcut(KeyCode.None),
                 description + ". Vide / None = non bindé");
+        }
+
+        private static void BindDebug(ConfigFile config)
+        {
+            DebugUnsynchronized = config.Bind(Debug, "debugunsychronized", "NONONO",
+                "Paramètre technique interne. Laisser sur NONONO sauf indication.");
         }
 
         // BepInEx garde les anciennes sections (Graphics, 1. Nuage magique, etc.)

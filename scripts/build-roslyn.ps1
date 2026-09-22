@@ -13,7 +13,7 @@ $lines += "/r:`"$managed\netstandard.dll`""
 Get-ChildItem $bindir -Filter '*_publicized.dll' | ForEach-Object { $lines += "/r:`"$($_.FullName)`"" }
 @('UnityEngine.dll', 'UnityEngine.UI.dll', 'Unity.TextMeshPro.dll', 'Unity.InputSystem.dll', 'BepInEx.dll', '0Harmony.dll', 'Jotunn.dll') | ForEach-Object { $lines += "/r:`"$bindir\$_`"" }
 Get-ChildItem $bindir -Filter 'UnityEngine.*Module.dll' | ForEach-Object { $lines += "/r:`"$($_.FullName)`"" }
-Get-ChildItem 'Qmod' -Filter *.cs -Recurse | ForEach-Object { $lines += "`"$($_.FullName)`"" }
+Get-ChildItem 'Qmod' -Filter *.cs -Recurse | Where-Object { $_.FullName -notmatch '\\(obj|bin)\\' } | ForEach-Object { $lines += "`"$($_.FullName)`"" }
 [IO.File]::WriteAllLines("$($PWD.ProviderPath)\$OutDir\csc.rsp", $lines)
 Write-Output "rsp lines: $($lines.Count)"
 & $csc "@$OutDir\csc.rsp"

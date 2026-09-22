@@ -102,6 +102,12 @@ namespace Qmod
                 return;
             }
 
+            if (!ModConfig.IsOdin())
+            {
+                Util.NotifyPlayer(player, "Odin ne répond pas");
+                return;
+            }
+
             if (GUIManager.Instance == null || !GUIManager.CustomGUIFront)
             {
                 return;
