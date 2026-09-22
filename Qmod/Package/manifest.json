@@ -1,0 +1,10 @@
+﻿{
+  "name": "Qmod",
+  "description": "Graphismes, camera Yotei/cinematique, HUD, craft depuis les coffres, eclair et teleportation.",
+  "version_number": "1.0.62",
+  "website_url": "",
+  "dependencies": [
+    "denikson-BepInExPack_Valheim-5.4.2333",
+    "ValheimModding-Jotunn-2.30.1"
+  ]
+}
