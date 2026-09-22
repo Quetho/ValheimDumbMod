@@ -13,7 +13,6 @@ permissions:
   contents: read
 
 env:
-  VALHEIM_INSTALL: C:\VHINSTALL
   VALHEIM_APPID: "896660"
   # Keep in sync with Qmod/Package/manifest.json (denikson-BepInExPack_Valheim).
   BEPINEX_PACK: "5.4.2333"
@@ -23,7 +22,7 @@ env:
 jobs:
   build:
     name: Build Qmod
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - name: Checkout
@@ -34,83 +33,81 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      - name: Valheim install path
+        run: echo "VALHEIM_INSTALL=$HOME/VHINSTALL" >> "$GITHUB_ENV"
+
       - name: Valheim dedicated server build id
         id: valheimversion
-        shell: pwsh
         run: |
-          $buildId = "unknown"
-          try {
-            $info = Invoke-RestMethod -Uri "https://api.steamcmd.net/v1/info/${{ env.VALHEIM_APPID }}" -TimeoutSec 60
-            $buildId = [string]$info.data.'${{ env.VALHEIM_APPID }}'.depots.branches.public.buildid
-          } catch {
-            Write-Host "steamcmd.net lookup failed: $($_.Exception.Message)"
-          }
-          if ([string]::IsNullOrWhiteSpace($buildId)) { $buildId = "unknown" }
-          Write-Host "Valheim dedicated server buildid: $buildId"
-          "buildid=$buildId" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          buildid="unknown"
+          if info=$(curl -fsSL --max-time 60 "https://api.steamcmd.net/v1/info/${VALHEIM_APPID}"); then
+            parsed=$(printf '%s' "$info" | jq -r --arg app "$VALHEIM_APPID" '.data[$app].depots.branches.public.buildid // empty')
+            if [ -n "$parsed" ] && [ "$parsed" != "null" ]; then
+              buildid="$parsed"
+            fi
+          else
+            echo "steamcmd.net lookup failed"
+          fi
+          echo "Valheim dedicated server buildid: $buildid"
+          echo "buildid=$buildid" >> "$GITHUB_OUTPUT"
 
       - name: Cache Valheim install
         id: cachevalheim
         uses: actions/cache@v5
         with:
           path: ${{ env.VALHEIM_INSTALL }}
-          key: valheim-${{ steps.valheimversion.outputs.buildid }}-bepinex-${{ env.BEPINEX_PACK }}
+          key: valheim-${{ steps.valheimversion.outputs.buildid }}-bepinex-${{ env.BEPINEX_PACK }}-linux
 
       - name: Install Valheim dedicated server and BepInEx
         if: steps.cachevalheim.outputs.cache-hit != 'true'
-        shell: pwsh
         run: |
-          $ErrorActionPreference = "Stop"
-          $PSNativeCommandUseErrorActionPreference = $false
-          $install = "${{ env.VALHEIM_INSTALL }}"
-          $steamcmd = "C:\steamcmd\steamcmd.exe"
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends lib32gcc-s1 unzip
+          mkdir -p "$HOME/steamcmd"
+          curl -fsSL "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" -o /tmp/steamcmd.tar.gz
+          tar -xzf /tmp/steamcmd.tar.gz -C "$HOME/steamcmd"
+          "$HOME/steamcmd/steamcmd.sh" +quit || true
 
-          New-Item -ItemType Directory -Force -Path C:\steamcmd | Out-Null
-          Invoke-WebRequest -Uri "https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip" -OutFile C:\steamcmd.zip
-          Expand-Archive C:\steamcmd.zip -DestinationPath C:\steamcmd -Force
+          managed="$VALHEIM_INSTALL/valheim_server_Data/Managed/assembly_valheim.dll"
+          attempt=0
+          while [ ! -f "$managed" ] && [ "$attempt" -lt 3 ]; do
+            attempt=$((attempt + 1))
+            "$HOME/steamcmd/steamcmd.sh" +force_install_dir "$VALHEIM_INSTALL" +login anonymous +app_update "$VALHEIM_APPID" validate +quit || true
+            echo "steamcmd app_update attempt $attempt"
+          done
+          if [ ! -f "$managed" ]; then
+            echo "Valheim dedicated server was not installed (app $VALHEIM_APPID)." >&2
+            exit 1
+          fi
 
-          & $steamcmd +quit
-          Write-Host "steamcmd bootstrap exit $LASTEXITCODE"
+          # Qmod.csproj resolves assemblies from valheim_Data/Managed (case-sensitive on Linux).
+          mv "$VALHEIM_INSTALL/valheim_server_Data" "$VALHEIM_INSTALL/valheim_Data"
 
-          $managed = Join-Path $install "valheim_server_Data\Managed\assembly_valheim.dll"
-          $attempts = 0
-          do {
-            $attempts++
-            & $steamcmd +force_install_dir $install +login anonymous +app_update ${{ env.VALHEIM_APPID }} validate +quit
-            Write-Host "steamcmd app_update exit $LASTEXITCODE (attempt $attempts)"
-          } while (-not (Test-Path $managed) -and $attempts -lt 3)
+          curl -fsSL "https://thunderstore.io/package/download/denikson/BepInExPack_Valheim/${BEPINEX_PACK}/" -o /tmp/bepinex.zip
+          rm -rf /tmp/BepInExRaw
+          unzip -q /tmp/bepinex.zip -d /tmp/BepInExRaw
+          core=$(find /tmp/BepInExRaw -type f -path '*/BepInEx/core/BepInEx.dll' -print -quit)
+          if [ -z "$core" ]; then
+            echo "BepInEx.dll was not found in BepInExPack_Valheim ${BEPINEX_PACK}." >&2
+            exit 1
+          fi
+          pack_root=$(dirname "$(dirname "$(dirname "$core")")")
+          cp -a "$pack_root"/. "$VALHEIM_INSTALL"/
 
-          if (-not (Test-Path $managed)) {
-            throw "Valheim dedicated server was not installed (app ${{ env.VALHEIM_APPID }})."
-          }
-
-          # Qmod.csproj resolves assemblies from valheim_Data/Managed.
-          Rename-Item (Join-Path $install "valheim_server_Data") "valheim_Data"
-
-          $bepinexZip = "C:\bepinex.zip"
-          Invoke-WebRequest -Uri "https://thunderstore.io/package/download/denikson/BepInExPack_Valheim/${{ env.BEPINEX_PACK }}/" -OutFile $bepinexZip
-          Expand-Archive $bepinexZip -DestinationPath C:\BepInExRaw -Force
-          $core = Get-ChildItem -Path C:\BepInExRaw -Recurse -Filter BepInEx.dll |
-            Where-Object { $_.Directory.Name -eq "core" } |
-            Select-Object -First 1
-          if (-not $core) { throw "BepInEx.dll was not found in BepInExPack_Valheim ${{ env.BEPINEX_PACK }}." }
-          $packRoot = $core.Directory.Parent.Parent.FullName
-          Copy-Item -Path (Join-Path $packRoot "*") -Destination $install -Recurse -Force
-
-          if (-not (Test-Path (Join-Path $install "BepInEx\core\BepInEx.dll"))) {
-            throw "BepInEx was not copied into $install."
-          }
-          if (-not (Test-Path (Join-Path $install "valheim_Data\Managed\assembly_valheim.dll"))) {
-            throw "assembly_valheim.dll is missing after renaming valheim_server_Data."
-          }
+          test -f "$VALHEIM_INSTALL/BepInEx/core/BepInEx.dll"
+          test -f "$VALHEIM_INSTALL/valheim_Data/Managed/assembly_valheim.dll"
 
       - name: Build Release
-        shell: pwsh
         run: |
-          dotnet build Qmod.sln --configuration Release --verbosity minimal `
-            -p:VALHEIM_INSTALL="${{ env.VALHEIM_INSTALL }}" `
-            -p:MOD_DEPLOYPATH="${{ env.VALHEIM_INSTALL }}\BepInEx\plugins" `
-            -p:UNITY_FOLDER="C:\no-unity"
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends zip
+          dotnet build Qmod.sln --configuration Release --verbosity minimal \
+            -p:VALHEIM_INSTALL="$VALHEIM_INSTALL" \
+            -p:BEPINEX_PATH="$VALHEIM_INSTALL/BepInEx" \
+            -p:MOD_DEPLOYPATH="$VALHEIM_INSTALL/BepInEx/plugins" \
+            -p:UNITY_FOLDER="/tmp/no-unity"
 
       - name: Upload Thunderstore package
         uses: actions/upload-artifact@v6
@@ -120,4 +117,4 @@ jobs:
           retention-days: 14
           path: |
             Qmod/bin/Release/net48/Qmod.dll
-            Qmod/bin/Release/net48/Qmod.zip
+            Qmod/Qmod.zip
