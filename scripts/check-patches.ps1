@@ -29,7 +29,19 @@ function Visit($t) {
       foreach ($pm in ($n.Methods | Where-Object { $_.Name -eq 'Prefix' -or $_.Name -eq 'Postfix' -or $_.Name -eq 'Finalizer' -or $_.Name -eq 'Transpiler' })) {
         foreach ($par in $pm.Parameters) {
           $pn = $par.Name
-          if ($pn.StartsWith('___') -or $special -contains $pn) { continue }
+          if ($special -contains $pn) { continue }
+          if ($pn.StartsWith('___')) {
+            $fn = $pn.Substring(3)
+            $ft = $tt
+            $found = $false
+            while ($ft -ne $null -and -not $found) {
+              if (@($ft.Fields | Where-Object { $_.Name -eq $fn }).Count -gt 0) { $found = $true; break }
+              try { $ft = $ft.BaseType.Resolve() } catch { $ft = $null }
+            }
+            $script:checked++
+            if (-not $found) { Write-Output "CHAMP INCONNU: $($n.FullName)::$($pm.Name) ($pn) cible=$targetType"; $script:errors++ }
+            continue
+          }
           $ok = $false
           foreach ($c in $cands) { if (@($c.Parameters | Where-Object { $_.Name -eq $pn }).Count -gt 0) { $ok = $true; break } }
           $script:checked++

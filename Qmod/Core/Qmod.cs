@@ -12,7 +12,7 @@ namespace Qmod
     {
         public const string PluginGUID = "com.aeons.qmod";
         public const string PluginName = "Qmod";
-        public const string PluginVersion = "1.0.62";
+        public const string PluginVersion = "1.0.69";
 
         internal static Qmod Instance { get; private set; }
 
@@ -28,6 +28,17 @@ namespace Qmod
             WaterShader.Init();
             WatchConfigFile();
             Harmony.CreateAndPatchAll(typeof(Qmod).Assembly, PluginGUID);
+            bool navPatched = false;
+            foreach (System.Reflection.MethodBase patched in Harmony.GetAllPatchedMethods())
+            {
+                if (patched.DeclaringType == typeof(BuildUi) && patched.Name == "NavigationUpdate")
+                {
+                    navPatched = true;
+                    break;
+                }
+            }
+
+            Jotunn.Logger.LogInfo("BuildPull: patch NavigationUpdate applique=" + navPatched);
             if (!GUIManager.IsHeadless())
             {
                 GUIManager.OnCustomGUIAvailable += ThorTp.OnGuiAvailable;

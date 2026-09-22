@@ -44,10 +44,11 @@ namespace Qmod
         private static float nextChestScan;
         private static bool createFailed;
         private static bool pullRunning;
+        private static Action pullFinishedCallback;
         private static bool wasShown;
         private static readonly List<ItemDrop.ItemData> foundStacks = new List<ItemDrop.ItemData>();
         private static readonly List<ItemDrop.ItemData> playerStacks = new List<ItemDrop.ItemData>();
-        private static readonly List<Container> nearbyChests = new List<Container>();
+        internal static readonly List<Container> nearbyChests = new List<Container>();
         private static readonly HashSet<Container> seenChests = new HashSet<Container>();
         private static readonly HashSet<Container> touchedChests = new HashSet<Container>();
         private static readonly List<PullPlan> plans = new List<PullPlan>();
@@ -398,7 +399,7 @@ namespace Qmod
             }
         }
 
-        private static float PullScanRadius()
+        internal static float PullScanRadius()
         {
             if (ModConfig.CraftPullRadius != null)
             {
@@ -408,7 +409,7 @@ namespace Qmod
             return 50f;
         }
 
-        private static long LocalPlayerId()
+        internal static long LocalPlayerId()
         {
             if (Game.instance)
             {
@@ -674,7 +675,7 @@ namespace Qmod
             return missing;
         }
 
-        private static string GetResourceName(Piece.Requirement req)
+        internal static string GetResourceName(Piece.Requirement req)
         {
             if (req == null || !req.m_resItem || req.m_resItem.m_itemData == null || req.m_resItem.m_itemData.m_shared == null)
             {
@@ -742,7 +743,60 @@ namespace Qmod
             }
         }
 
-        private static int GatherChests(Vector3 center, float radius, long playerId, bool verbose)
+        internal static bool IsPullRunning()
+        {
+            return pullRunning;
+        }
+
+        // Pull pour une pièce de construction (menu marteau), quantité count.
+        // Les coffres doivent déjà être scannés (GatherChests par l'appelant).
+        internal static void PullForPieces(Piece piece, int count, Action onDone)
+        {
+            if (pullRunning || piece == null || piece.m_resources == null)
+            {
+                return;
+            }
+
+            Player player = Player.m_localPlayer;
+            Inventory playerInv = player ? player.GetInventory() : null;
+            if (playerInv == null)
+            {
+                return;
+            }
+
+            plans.Clear();
+            int totalTake = 0;
+            for (int i = 0; i < piece.m_resources.Length; i++)
+            {
+                PullPlan plan = PlanRequirement(playerInv, piece.m_resources[i], 1, count);
+                plans.Add(plan);
+                totalTake += plan.Take;
+            }
+
+            Jotunn.Logger.LogInfo("BuildPull: x" + count + " " + Util.GetPrefabName(piece.gameObject) +
+                ", " + totalTake + " à prendre");
+            LogPlans();
+            if (totalTake <= 0)
+            {
+                ReportShortage(player, plans);
+                plans.Clear();
+                return;
+            }
+
+            pullFinishedCallback = onDone;
+            pullRunning = true;
+            if (Qmod.Instance)
+            {
+                Qmod.Instance.StartCoroutine(ExecutePull(player, playerInv));
+            }
+            else
+            {
+                ExecuteMoves(playerInv);
+                FinishPull(player, playerInv);
+            }
+        }
+
+        internal static int GatherChests(Vector3 center, float radius, long playerId, bool verbose)
         {
             nearbyChests.Clear();
             seenChests.Clear();
@@ -836,7 +890,7 @@ namespace Qmod
             return nearbyChests.Count;
         }
 
-        private static PullPlan PlanRequirement(Inventory playerInv, Piece.Requirement req, int quality)
+        internal static PullPlan PlanRequirement(Inventory playerInv, Piece.Requirement req, int quality, int multiplier = 1)
         {
             PullPlan plan = new PullPlan();
             plan.ResName = GetResourceName(req);
@@ -851,7 +905,7 @@ namespace Qmod
                 maxStack = 1;
             }
 
-            plan.Need = req.GetAmount(quality);
+            plan.Need = req.GetAmount(quality) * Mathf.Max(1, multiplier);
             // Compter exactement comme le menu (CountItems -1/true) : seuls les
             // objets du niveau de monde courant servent au craft.
             plan.Have = playerInv.CountItems(plan.ResName, -1, true);
@@ -914,7 +968,7 @@ namespace Qmod
             return space + empty * maxStack;
         }
 
-        private static IEnumerator ExecutePull(Player player, Inventory playerInv)
+        internal static IEnumerator ExecutePull(Player player, Inventory playerInv)
         {
             for (int i = 0; i < nearbyChests.Count; i++)
             {
@@ -935,6 +989,7 @@ namespace Qmod
             if (!AllOwned())
             {
                 pullRunning = false;
+                pullFinishedCallback = null;
                 Util.NotifyPlayer(player, "Coffres inaccessibles (pas d'ownership)");
                 Jotunn.Logger.LogWarning("ChestPull: ownership non obtenue, abandon");
                 plans.Clear();
@@ -964,7 +1019,7 @@ namespace Qmod
             return true;
         }
 
-        private static void ExecuteMoves(Inventory playerInv)
+        internal static void ExecuteMoves(Inventory playerInv)
         {
             touchedChests.Clear();
             for (int i = 0; i < plans.Count; i++)
@@ -1077,7 +1132,7 @@ namespace Qmod
             }
         }
 
-        private static void FinishPull(Player player, Inventory playerInv)
+        internal static void FinishPull(Player player, Inventory playerInv)
         {
             pullRunning = false;
             int moved = 0;
@@ -1111,9 +1166,15 @@ namespace Qmod
             }
 
             Refresh(InventoryGui.instance);
+            if (pullFinishedCallback != null)
+            {
+                Action done = pullFinishedCallback;
+                pullFinishedCallback = null;
+                done();
+            }
         }
 
-        private static void LogPlans()
+        internal static void LogPlans()
         {
             for (int i = 0; i < plans.Count; i++)
             {
@@ -1122,7 +1183,7 @@ namespace Qmod
             }
         }
 
-        private static void ReportShortage(Player player, List<PullPlan> current)
+        internal static void ReportShortage(Player player, List<PullPlan> current)
         {
             bool noSpace = false;
             for (int i = 0; i < current.Count; i++)
@@ -1136,7 +1197,7 @@ namespace Qmod
             Util.NotifyPlayer(player, noSpace ? "Inventaire plein" : "Rien à récupérer dans les coffres proches");
         }
 
-        private class PullPlan
+        internal class PullPlan
         {
             public string ResName;
             public int Need;

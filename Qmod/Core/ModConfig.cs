@@ -77,6 +77,7 @@ namespace Qmod
         internal static ConfigEntry<KeyboardShortcut> SwapShoulder;
 
         internal static ConfigEntry<bool> FreePlacementEnabled;
+        internal static ConfigEntry<bool> BuildPullEnabled;
 
         internal static ConfigEntry<bool> WolfRideEnabled;
         internal static ConfigEntry<float> WolfRideSaddleHeight;
@@ -228,6 +229,8 @@ namespace Qmod
         {
             FreePlacementEnabled = config.Bind(Build, "FreePlacementEnabled", true,
                 "Les pièces peuvent se croiser / se chevaucher (fantôme vert) et les points d'ancrage restent actifs sur un emplacement déjà occupé. S'applique aussi au terrain");
+            BuildPullEnabled = config.Bind(Build, "BuildPullEnabled", true,
+                "Menu marteau : stock coffres affiché après 1 s de survol, clic droit sur une pièce = pull pour x10 (ou le max couvert). Rayon : CraftPullRadius");
         }
 
         private static void BindMounts(ConfigFile config)
