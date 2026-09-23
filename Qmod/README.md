@@ -21,8 +21,15 @@ Requiert BepInEx et Jotunn (voir `manifest.json`).
   par monde, TP vers/à les joueurs, et page de spawn de ressources.
 - **Craft** : bouton "Pull" dans l'onglet fabrication
   (forge/établi) qui prend les matériaux manquants dans les coffres
-  proches (rayon réglable, défaut 50 m) ; le mode cultiver du
-  cultivateur récolte les légumes prêts.
+  proches (rayon réglable, défaut 50 m). Le pull du marteau reprend
+  les mêmes coffres. Bouton coffre au-dessus de
+  l'armure, à droite de l'inventaire (et raccourci), pour ranger
+  l'inventaire dans les coffres proches qui ne contiennent qu'une
+  ressource et ont de la place. Pull et rangement n'utilisent que les
+  coffres posés par le joueur ; un coffre sans poseur connu est ignoré
+  s'il est dans la zone d'une balise qui appartient à quelqu'un d'autre. Le transfert est bloqué 10 s avant
+  et 10 s après la sauvegarde serveur (bouton rouge). Le mode cultiver du cultivateur
+  récolte les légumes prêts.
 - **Farming** : message configurable au kill sanglier avec le butcher knife,
   spawn d'un sanglier 2 étoiles apprivoisé.
 - **HUD** : liste des bonus/malus en bas à droite, masquage auto du HUD

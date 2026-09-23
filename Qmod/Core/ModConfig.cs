@@ -8,17 +8,13 @@ namespace Qmod
 {
     internal static class ModConfig
     {
-        private const string Graphics = "01. Graphiques";
-        private const string Cloud = "02. Nuage magique";
-        private const string Lightning = "03. Eclair";
-        private const string Craft = "04. Craft";
-        private const string Farming = "05. Farming";
-        private const string Hud = "06. HUD";
-        private const string Camera = "07. Camera";
-        private const string Build = "08. Construction";
-        private const string Mounts = "09. Montures";
-        private const string Debug = "10. Debug";
-        private const string Ranges = "11. Rayons";
+        private const string Options = "0 - options";
+        private const string Camera = "1 - camera";
+        private const string Graphics = "2 - graphismes";
+        private const string Hud = "3 - hud";
+        private const string Farming = "4 - farming";
+        private const string Mounts = "5 - montures";
+        private const string Debug = "6 - debug";
 
         internal static ConfigEntry<bool> SupersamplingEnabled;
         internal static ConfigEntry<float> SupersamplingScale;
@@ -26,32 +22,14 @@ namespace Qmod
         internal static ConfigEntry<KeyboardShortcut> ToggleSupersampling;
         internal static ConfigEntry<KeyboardShortcut> ToggleWaterShader;
 
-        internal static ConfigEntry<bool> MagicBushEnabled;
-        internal static ConfigEntry<string> MagicBushPrefab;
-        internal static ConfigEntry<float> MagicBushSpeed;
-        internal static ConfigEntry<float> MagicBushSprintSpeed;
-        internal static ConfigEntry<float> MagicBushAcceleration;
-        internal static ConfigEntry<float> MagicBushMaxAltitude;
-        internal static ConfigEntry<float> MagicBushScale;
-        internal static ConfigEntry<KeyboardShortcut> ToggleMagicBush;
-        internal static ConfigEntry<KeyboardShortcut> MagicBushThrust;
-        internal static ConfigEntry<KeyboardShortcut> MagicBushBrake;
-        internal static ConfigEntry<KeyboardShortcut> MagicBushStrafeUp;
-        internal static ConfigEntry<KeyboardShortcut> MagicBushStrafeDown;
-
-        internal static ConfigEntry<bool> LightningEnabled;
-        internal static ConfigEntry<bool> LightningMessage;
-        internal static ConfigEntry<KeyboardShortcut> StrikeLightning;
-        internal static ConfigEntry<KeyboardShortcut> ToggleTpMenu;
-        internal static ConfigEntry<KeyboardShortcut> AimLightning;
-
         internal static ConfigEntry<bool> CraftPullEnabled;
         internal static ConfigEntry<float> CraftPullRadius;
+        internal static ConfigEntry<bool> ChestDumpEnabled;
+        internal static ConfigEntry<KeyboardShortcut> ChestDump;
 
         internal static ConfigEntry<string> KillMessage;
         internal static ConfigEntry<bool> CultivateHarvestEnabled;
         internal static ConfigEntry<KeyboardShortcut> ToggleCultivateHarvest;
-        internal static ConfigEntry<KeyboardShortcut> SpawnBoar;
 
         internal static ConfigEntry<bool> StatusHudEnabled;
         internal static ConfigEntry<bool> UnarmedHudHideEnabled;
@@ -88,9 +66,7 @@ namespace Qmod
         internal static ConfigEntry<string> DebugUnsynchronized;
 
         internal static ConfigEntry<float> ComfortRadius;
-        internal static ConfigEntry<float> WorkbenchRadius;
-        internal static ConfigEntry<float> StonecutterRadius;
-        internal static ConfigEntry<float> ArtisanRadius;
+        internal static ConfigEntry<float> ConstructionRadius;
         internal static ConfigEntry<float> UpgradeRadius;
 
         private const string odintoken = "ODINISMYKING";
@@ -109,20 +85,20 @@ namespace Qmod
             if (ConfigMigration.MigrateFile(config.ConfigFilePath))
             {
                 config.Reload();
-                Jotunn.Logger.LogInfo("Config Qmod migrée vers les sections 01.-09. (backup .bak)");
+                Jotunn.Logger.LogInfo("Config Qmod migrée (0 - options … 6 - debug, backup .bak)");
             }
 
-            BindGraphics(config);
-            BindCloud(config);
-            BindLightning(config);
-            BindCraft(config);
-            BindFarming(config);
-            BindHud(config);
-            BindCamera(config);
+            BindRanges(config);
             BindBuild(config);
+            BindCraft(config);
+            BindCamera(config);
+            BindGraphics(config);
+            BindHud(config);
+            BindFarming(config);
             BindMounts(config);
             BindDebug(config);
-            BindRanges(config);
+            MagicBush.ReadBinds(config);
+            ThorLightning.ReadBinds(config);
 
             ScrubOrphans(config);
         }
@@ -140,54 +116,15 @@ namespace Qmod
             ToggleWaterShader = BindKey(config, Graphics, "ToggleWaterShader", "Activer/désactiver le look d'eau");
         }
 
-        private static void BindCloud(ConfigFile config)
-        {
-            MagicBushEnabled = config.Bind(Cloud, "Enabled", true,
-                "Nuage magique. Appeler / renvoyer avec Toggle");
-            MagicBushPrefab = config.Bind(Cloud, "Prefab", "Bush01",
-                "Prefab visuel. Bush01, RaspberryBush, BlueberryBush, CloudberryBush, Bush02_en...");
-            MagicBushSpeed = config.Bind(Cloud, "Speed", 22f,
-                new ConfigDescription("Vitesse près du sol (m/s)", new AcceptableValueRange<float>(8f, 50f)));
-            MagicBushSprintSpeed = config.Bind(Cloud, "SprintSpeed", 36f,
-                new ConfigDescription("Vitesse en l'air (m/s)", new AcceptableValueRange<float>(12f, 70f)));
-            MagicBushAcceleration = config.Bind(Cloud, "Acceleration", 12f,
-                new ConfigDescription("Réactivité (plus haut = plus pêchu)", new AcceptableValueRange<float>(4f, 30f)));
-            MagicBushMaxAltitude = config.Bind(Cloud, "MaxAltitude", 250f,
-                new ConfigDescription("Plafond (m)", new AcceptableValueRange<float>(40f, 1500f)));
-            MagicBushScale = config.Bind(Cloud, "Scale", 1.25f,
-                new ConfigDescription("Taille du buisson", new AcceptableValueRange<float>(0.6f, 3f)));
-            ToggleMagicBush = config.Bind(Cloud, "Toggle", new KeyboardShortcut(KeyCode.None),
-                "Appeler / renvoyer le nuage. Vide / None = non bindé");
-            MagicBushThrust = config.Bind(Cloud, "Thrust", new KeyboardShortcut(KeyCode.W),
-                "Avancer (maintenir). Près du sol tu glisses, en l'air tu suis le regard");
-            MagicBushBrake = config.Bind(Cloud, "Brake", new KeyboardShortcut(KeyCode.S),
-                "Frein (maintenir)");
-            MagicBushStrafeUp = config.Bind(Cloud, "StrafeUp", new KeyboardShortcut(KeyCode.Space),
-                "Monter (maintenir)");
-            MagicBushStrafeDown = config.Bind(Cloud, "StrafeDown", new KeyboardShortcut(KeyCode.LeftControl),
-                "Descendre (maintenir)");
-        }
-
-        private static void BindLightning(ConfigFile config)
-        {
-            LightningEnabled = config.Bind(Lightning, "Enabled", true,
-                "Éclair de l'Oblitérateur sur le joueur. Les autres le voient, même sans Qmod");
-            LightningMessage = config.Bind(Lightning, "Message", true,
-                "Afficher le message de Thor quand tu déclenches l'éclair");
-            StrikeLightning = config.Bind(Lightning, "Strike", new KeyboardShortcut(KeyCode.None),
-                "Frappe d'éclair sur toi. Vide / None = non bindé");
-            ToggleTpMenu = config.Bind(Lightning, "Menu", new KeyboardShortcut(KeyCode.None),
-                "Ouvrir / fermer le menu de téléportation. Vide / None = non bindé");
-            AimLightning = config.Bind(Lightning, "Aim", new KeyboardShortcut(KeyCode.None),
-                "Foudre dirigée : bras, éclair, pointer, frappe horizontale vers le visuel. Vide / None = non bindé");
-        }
-
         private static void BindCraft(ConfigFile config)
         {
-            CraftPullEnabled = config.Bind(Craft, "CraftPullEnabled", true,
+            CraftPullEnabled = config.Bind(Options, "CraftPullEnabled", true,
                 "Bouton 'Pull' (fabrication + amélioration, toutes stations) quand il manque des matériaux");
-            CraftPullRadius = config.Bind(Craft, "CraftPullRadius", 50f,
+            CraftPullRadius = config.Bind(Options, "CraftPullRadius", 50f,
                 new ConfigDescription("Rayon (m) autour du joueur pour chercher les coffres", new AcceptableValueRange<float>(5f, 150f)));
+            ChestDumpEnabled = config.Bind(Options, "ChestDumpEnabled", true,
+                "Bouton coffre au-dessus de l'armure (à droite de l'inventaire) et raccourci : range l'inventaire dans les coffres proches qui ne contiennent qu'une ressource et ont de la place. Rayon : CraftPullRadius");
+            ChestDump = BindKey(config, Options, "ChestDump", "Ranger l'inventaire dans les coffres mono-ressource proches");
         }
 
         private static void BindFarming(ConfigFile config)
@@ -197,7 +134,6 @@ namespace Qmod
             CultivateHarvestEnabled = config.Bind(Farming, "CultivateHarvestEnabled", true,
                 "Le mode cultiver du cultivateur fait sortir les légumes prêts du sol");
             ToggleCultivateHarvest = BindKey(config, Farming, "ToggleCultivateHarvest", "Activer/désactiver la récolte au cultivateur");
-            SpawnBoar = BindKey(config, Farming, "SpawnBoar", "Faire apparaître un sanglier 2★ apprivoisé devant toi");
         }
 
         private static void BindHud(ConfigFile config)
@@ -251,9 +187,9 @@ namespace Qmod
 
         private static void BindBuild(ConfigFile config)
         {
-            FreePlacementEnabled = config.Bind(Build, "FreePlacementEnabled", true,
+            FreePlacementEnabled = config.Bind(Options, "FreePlacementEnabled", true,
                 "Les pièces peuvent se croiser / se chevaucher (fantôme vert) et les points d'ancrage restent actifs sur un emplacement déjà occupé. S'applique aussi au terrain");
-            BuildPullEnabled = config.Bind(Build, "BuildPullEnabled", true,
+            BuildPullEnabled = config.Bind(Options, "BuildPullEnabled", true,
                 "Menu marteau : stock coffres affiché après 1 s de survol, clic droit sur une pièce = pull pour x10 (ou le max couvert). Rayon : CraftPullRadius");
         }
 
@@ -280,41 +216,134 @@ namespace Qmod
 
         private static void BindRanges(ConfigFile config)
         {
-            ComfortRadius = config.Bind(Ranges, "ComfortRadius", 0f,
-                new ConfigDescription("Rayon (m) de recherche des pièces de confort pour le bonus reposé. 0 = vanilla (10 m)",
+            ComfortRadius = config.Bind(Options, "ComfortRadius", 0f,
+                new ConfigDescription("Rayon de confort (m) : pièces prises en compte pour le bonus reposé. 0 = vanilla (10 m)",
                     new AcceptableValueRange<float>(0f, 60f)));
-            WorkbenchRadius = config.Bind(Ranges, "WorkbenchRadius", 0f,
-                new ConfigDescription("Rayon de construction de l'établi. 0 = vanilla",
+
+            Dictionary<ConfigDefinition, string> orphans = Orphans(config);
+            bool hadConstruction = HasEntry(orphans, "ConstructionRadius");
+            float legacyConstruction = MaxLegacyRadius(orphans);
+            ConstructionRadius = config.Bind(Options, "ConstructionRadius", 0f,
+                new ConfigDescription("Rayon de construction (m) : toutes les stations (établi, forge, forge noire, tailleur de pierre, table d'artisan, chaudron, table de Galdr, table de préparation). 0 = vanilla",
                     new AcceptableValueRange<float>(0f, 150f)));
-            StonecutterRadius = config.Bind(Ranges, "StonecutterRadius", 0f,
-                new ConfigDescription("Rayon de construction du tailleur de pierre. 0 = vanilla",
+            if (!hadConstruction && legacyConstruction > 0f)
+            {
+                ConstructionRadius.Value = Mathf.Clamp(legacyConstruction, 0f, 150f);
+            }
+
+            UpgradeRadius = config.Bind(Options, "UpgradeRadius", 0f,
+                new ConfigDescription("Rayon des améliorations (m) : distance max des extensions autour de leur station. 0 = vanilla",
                     new AcceptableValueRange<float>(0f, 150f)));
-            ArtisanRadius = config.Bind(Ranges, "ArtisanRadius", 0f,
-                new ConfigDescription("Rayon de construction de la table d'artisan. 0 = vanilla",
-                    new AcceptableValueRange<float>(0f, 150f)));
-            UpgradeRadius = config.Bind(Ranges, "UpgradeRadius", 0f,
-                new ConfigDescription("Distance max des améliorations autour des stations (chaudrons, forge, établi, forge noire...). 0 = vanilla",
-                    new AcceptableValueRange<float>(0f, 150f)));
+        }
+
+        // Anciens rayons par station (établi, tailleur, artisan). La plus
+        // grande valeur non nulle devient ConstructionRadius, une fois.
+        private static float MaxLegacyRadius(Dictionary<ConfigDefinition, string> orphans)
+        {
+            if (orphans == null)
+            {
+                return 0f;
+            }
+
+            float max = 0f;
+            string[] keys = { "WorkbenchRadius", "StonecutterRadius", "ArtisanRadius" };
+            for (int i = 0; i < keys.Length; i++)
+            {
+                string raw;
+                if (!TryLegacy(orphans, keys[i], out raw))
+                {
+                    continue;
+                }
+
+                float value;
+                if (float.TryParse(raw, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out value) ||
+                    float.TryParse(raw, out value))
+                {
+                    max = Mathf.Max(max, value);
+                }
+            }
+
+            return max;
+        }
+
+        private static bool HasEntry(Dictionary<ConfigDefinition, string> orphans, string key)
+        {
+            string ignored;
+            return TryLegacy(orphans, key, out ignored);
+        }
+
+        // La migration a déjà renommé la section, mais un fichier non réécrit
+        // peut encore porter les anciens rayons sous 11. Rayons.
+        private static bool TryLegacy(Dictionary<ConfigDefinition, string> orphans, string key, out string raw)
+        {
+            raw = null;
+            if (orphans == null)
+            {
+                return false;
+            }
+
+            if (orphans.TryGetValue(new ConfigDefinition(Options, key), out raw))
+            {
+                return true;
+            }
+
+            return orphans.TryGetValue(new ConfigDefinition("11. Rayons", key), out raw);
+        }
+
+        internal static bool TryGetOrphan(ConfigFile config, string section, string key, out string value)
+        {
+            value = null;
+            Dictionary<ConfigDefinition, string> orphans = Orphans(config);
+            if (orphans == null)
+            {
+                return false;
+            }
+
+            return orphans.TryGetValue(new ConfigDefinition(section, key), out value);
+        }
+
+        private static Dictionary<ConfigDefinition, string> Orphans(ConfigFile config)
+        {
+            PropertyInfo prop = typeof(ConfigFile).GetProperty("OrphanedEntries",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (prop == null)
+            {
+                return null;
+            }
+
+            return prop.GetValue(config) as Dictionary<ConfigDefinition, string>;
         }
 
         // BepInEx garde les anciennes sections (Graphics, 1. Nuage magique, etc.)
         // dans OrphanedEntries : on les vire pour que le menu in-game soit propre.
         private static void ScrubOrphans(ConfigFile config)
         {
-            PropertyInfo prop = typeof(ConfigFile).GetProperty("OrphanedEntries",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (prop == null)
-            {
-                return;
-            }
-
-            Dictionary<ConfigDefinition, string> orphans = prop.GetValue(config) as Dictionary<ConfigDefinition, string>;
+            Dictionary<ConfigDefinition, string> orphans = Orphans(config);
             if (orphans == null || orphans.Count == 0)
             {
                 return;
             }
 
-            orphans.Clear();
+            List<ConfigDefinition> drop = new List<ConfigDefinition>();
+            foreach (KeyValuePair<ConfigDefinition, string> pair in orphans)
+            {
+                if (!MagicBush.PreserveOrphan(pair.Key.Section, pair.Key.Key) &&
+                    !ThorLightning.PreserveOrphan(pair.Key.Section, pair.Key.Key))
+                {
+                    drop.Add(pair.Key);
+                }
+            }
+
+            if (drop.Count == 0)
+            {
+                return;
+            }
+
+            for (int i = 0; i < drop.Count; i++)
+            {
+                orphans.Remove(drop[i]);
+            }
+
             config.Save();
         }
     }

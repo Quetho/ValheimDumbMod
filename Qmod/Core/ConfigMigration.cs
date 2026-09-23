@@ -4,37 +4,46 @@ using System.IO;
 
 namespace Qmod
 {
-    // Migration one-shot du .cfg après le renommage des sections (1.0.45).
-    // Pur texte et idempotent : ne réécrit le fichier que si un ancien
-    // header ou une clé à déplacer est trouvé. Backup .bak avant écriture.
+    // Migration one-shot du .cfg. Pur texte et idempotent : ne réécrit
+    // le fichier que si un ancien header ou une clé à déplacer est trouvé.
+    // Backup .bak avant écriture. Les sections fusionnées (craft,
+    // construction, rayons) sortent en un seul bloc.
     internal static class ConfigMigration
     {
         private const string LegacyKeybinds = "Keybinds";
 
         private static readonly Dictionary<string, string> SectionRenames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            { "0. Graphiques", "01. Graphiques" },
+            { "0. Graphiques", "2 - graphismes" },
+            { "01. Graphiques", "2 - graphismes" },
             { "0. Nuage magique", "02. Nuage magique" },
             { "Eclair", "03. Eclair" },
-            { "Craft", "04. Craft" },
-            { "Farming", "05. Farming" },
-            { "HUD", "06. HUD" },
-            { "Camera", "07. Camera" }
+            { "Craft", "0 - options" },
+            { "04. Craft", "0 - options" },
+            { "08. Construction", "0 - options" },
+            { "11. Rayons", "0 - options" },
+            { "Farming", "4 - farming" },
+            { "05. Farming", "4 - farming" },
+            { "HUD", "3 - hud" },
+            { "06. HUD", "3 - hud" },
+            { "Camera", "1 - camera" },
+            { "07. Camera", "1 - camera" },
+            { "09. Montures", "5 - montures" },
+            { "10. Debug", "6 - debug" }
         };
 
         private static readonly Dictionary<string, string> KeybindMoves = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            { "ToggleSupersampling", "01. Graphiques" },
-            { "ToggleWaterShader", "01. Graphiques" },
-            { "ToggleCultivateHarvest", "05. Farming" },
-            { "SpawnBoar", "05. Farming" },
-            { "ToggleStatusHud", "06. HUD" },
-            { "ToggleUnarmedHudHide", "06. HUD" },
-            { "ToggleHugin", "06. HUD" },
-            { "ToggleYoteiCamera", "07. Camera" },
-            { "ToggleCinematicIdle", "07. Camera" },
-            { "StartCinematic", "07. Camera" },
-            { "SwapShoulder", "07. Camera" }
+            { "ToggleSupersampling", "2 - graphismes" },
+            { "ToggleWaterShader", "2 - graphismes" },
+            { "ToggleCultivateHarvest", "4 - farming" },
+            { "ToggleStatusHud", "3 - hud" },
+            { "ToggleUnarmedHudHide", "3 - hud" },
+            { "ToggleHugin", "3 - hud" },
+            { "ToggleYoteiCamera", "1 - camera" },
+            { "ToggleCinematicIdle", "1 - camera" },
+            { "StartCinematic", "1 - camera" },
+            { "SwapShoulder", "1 - camera" }
         };
 
         internal static bool MigrateFile(string path)
@@ -139,6 +148,7 @@ namespace Qmod
                 output.Add("");
             }
 
+            List<Section> emitted = new List<Section>();
             foreach (Section section in sections)
             {
                 if (section.Blocks.Count == 0)
@@ -152,7 +162,32 @@ namespace Qmod
                     changed = true;
                 }
 
-                output.Add("[" + emit + "]");
+                Section dest = null;
+                for (int i = 0; i < emitted.Count; i++)
+                {
+                    if (string.Equals(emitted[i].Name, emit, StringComparison.OrdinalIgnoreCase))
+                    {
+                        dest = emitted[i];
+                        break;
+                    }
+                }
+
+                if (dest == null)
+                {
+                    dest = new Section { Name = emit };
+                    emitted.Add(dest);
+                }
+                else
+                {
+                    changed = true;
+                }
+
+                dest.Blocks.AddRange(section.Blocks);
+            }
+
+            foreach (Section section in emitted)
+            {
+                output.Add("[" + section.Name + "]");
                 output.Add("");
                 foreach (List<string> block in section.Blocks)
                 {

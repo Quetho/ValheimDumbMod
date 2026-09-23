@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using BepInEx.Configuration;
 using HarmonyLib;
 using UnityEngine;
 
@@ -14,7 +15,13 @@ namespace Qmod
             Outgoing
         }
 
+        private const string ConfigSection = "02. Nuage magique";
         private const string FallbackPrefab = "Bush01";
+        private const float CruiseSpeed = 22f;
+        private const float AirSpeed = 36f;
+        private const float AccelResponse = 12f;
+        private const float AltitudeCap = 250f;
+        private const float BushScale = 1.25f;
         private const string SitAnimation = "attach_chair";
         private const float SitHeight = 0.28f;
         private const float MinClearance = 1.15f;
@@ -23,6 +30,15 @@ namespace Qmod
         private const float IncomingDuration = 0.85f;
         private const float OutgoingDuration = 1.15f;
         private static readonly int SlowFallHash = "SlowFall".GetStableHashCode();
+        private static readonly string[] BindKeys = { "Toggle", "Thrust", "Brake", "StrafeUp", "StrafeDown" };
+
+        // Raccourcis lus dans le .cfg s'ils y sont. Pas des réglages bindés :
+        // la section ne réapparaît pas dans le menu.
+        internal static KeyboardShortcut ToggleBind = KeyboardShortcut.Empty;
+        private static KeyboardShortcut thrustBind = KeyboardShortcut.Empty;
+        private static KeyboardShortcut brakeBind = KeyboardShortcut.Empty;
+        private static KeyboardShortcut upBind = KeyboardShortcut.Empty;
+        private static KeyboardShortcut downBind = KeyboardShortcut.Empty;
 
         private static Phase phase;
         private static GameObject root;
@@ -44,6 +60,44 @@ namespace Qmod
         internal static bool IsRiding => phase == Phase.Riding;
 
         internal static bool IsThrusting { get; private set; }
+
+        internal static bool PreserveOrphan(string section, string key)
+        {
+            if (!string.Equals(section, ConfigSection, System.StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            for (int i = 0; i < BindKeys.Length; i++)
+            {
+                if (string.Equals(key, BindKeys[i], System.StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        internal static void ReadBinds(ConfigFile config)
+        {
+            ToggleBind = ReadBind(config, "Toggle");
+            thrustBind = ReadBind(config, "Thrust");
+            brakeBind = ReadBind(config, "Brake");
+            upBind = ReadBind(config, "StrafeUp");
+            downBind = ReadBind(config, "StrafeDown");
+        }
+
+        private static KeyboardShortcut ReadBind(ConfigFile config, string key)
+        {
+            string raw;
+            if (config == null || !ModConfig.TryGetOrphan(config, ConfigSection, key, out raw) || string.IsNullOrWhiteSpace(raw))
+            {
+                return KeyboardShortcut.Empty;
+            }
+
+            return KeyboardShortcut.Deserialize(raw.Trim());
+        }
 
         private static bool IsRidingCharacter(Character character)
         {
@@ -74,7 +128,7 @@ namespace Qmod
                 return;
             }
 
-            if (!ModConfig.IsOdin() || !ModConfig.MagicBushEnabled.Value || !Util.CanAct(player))
+            if (!ModConfig.IsOdin() || !Util.CanAct(player))
             {
                 Dismount(grantSlowFall: false);
                 DestroyBush();
@@ -110,11 +164,6 @@ namespace Qmod
             if (!ModConfig.IsOdin())
             {
                 Util.NotifyPlayer(player, "Odin ne répond pas");
-                return;
-            }
-
-            if (ModConfig.MagicBushEnabled == null || !ModConfig.MagicBushEnabled.Value)
-            {
                 return;
             }
 
@@ -187,14 +236,14 @@ namespace Qmod
             Transform visual = clone.transform;
             visual.localPosition = Vector3.zero;
             visual.localRotation = Quaternion.identity;
-            visual.localScale = Vector3.one * ModConfig.MagicBushScale.Value;
+            visual.localScale = Vector3.one * BushScale;
             StripNetworkAndCollision(clone);
             return true;
         }
 
         private static GameObject ResolvePrefab()
         {
-            string name = ModConfig.MagicBushPrefab != null ? ModConfig.MagicBushPrefab.Value : FallbackPrefab;
+            string name = FallbackPrefab;
             if (string.IsNullOrWhiteSpace(name))
             {
                 name = FallbackPrefab;
@@ -306,9 +355,9 @@ namespace Qmod
         private static void Fly(float dt)
         {
             dt = Mathf.Max(dt, 0.0001f);
-            float cruise = ModConfig.MagicBushSpeed.Value;
-            float maxSpeed = Mathf.Max(cruise, ModConfig.MagicBushSprintSpeed.Value);
-            float response = ModConfig.MagicBushAcceleration.Value;
+            float cruise = CruiseSpeed;
+            float maxSpeed = Mathf.Max(cruise, AirSpeed);
+            float response = AccelResponse;
 
             Transform cam = GameCamera.instance ? GameCamera.instance.transform : root.transform;
             Vector3 look = cam.forward;
@@ -321,15 +370,15 @@ namespace Qmod
 
             flat.Normalize();
 
-            IsThrusting = ModInput.Held(ModConfig.MagicBushThrust) || ZInput.GetJoyLTrigger() > 0.35f;
-            bool braking = ModInput.Held(ModConfig.MagicBushBrake);
+            IsThrusting = ModInput.Held(thrustBind) || ZInput.GetJoyLTrigger() > 0.35f;
+            bool braking = ModInput.Held(brakeBind);
             float climb = 0f;
-            if (ModInput.Held(ModConfig.MagicBushStrafeUp) || ZInput.GetButton("JoyJump"))
+            if (ModInput.Held(upBind) || ZInput.GetButton("JoyJump"))
             {
                 climb += 1f;
             }
 
-            if (ModInput.Held(ModConfig.MagicBushStrafeDown) || ZInput.GetButton("JoyCrouch"))
+            if (ModInput.Held(downBind) || ZInput.GetButton("JoyCrouch"))
             {
                 climb -= 1f;
             }
@@ -412,7 +461,7 @@ namespace Qmod
                 floor = Mathf.Max(ground, ZoneSystem.instance.m_waterLevel) + MinClearance;
             }
 
-            ceiling = Mathf.Max(floor + 4f, ModConfig.MagicBushMaxAltitude.Value);
+            ceiling = Mathf.Max(floor + 4f, AltitudeCap);
         }
 
         private static void SnapPlayer(Player player)

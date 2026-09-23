@@ -91,11 +91,6 @@ namespace Qmod
 
         private static void Open()
         {
-            if (ModConfig.LightningEnabled == null || !ModConfig.LightningEnabled.Value)
-            {
-                return;
-            }
-
             Player player = Util.ActingPlayer();
             if (!player || MagicBush.IsActive)
             {

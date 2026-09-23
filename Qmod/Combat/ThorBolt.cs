@@ -23,11 +23,6 @@ namespace Qmod
 
         internal static void Cast()
         {
-            if (ModConfig.LightningEnabled == null || !ModConfig.LightningEnabled.Value)
-            {
-                return;
-            }
-
             if (casting || Time.unscaledTime < nextCast || ThorTp.IsTraveling)
             {
                 return;

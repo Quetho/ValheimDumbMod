@@ -1,3 +1,4 @@
+using BepInEx.Configuration;
 using HarmonyLib;
 using UnityEngine;
 
@@ -9,17 +10,55 @@ namespace Qmod
         private const string IncineratorPrefab = "incinerator";
         private const string SuccessToken = "$piece_incinerator_success";
         private const float Cooldown = 1.5f;
+        private const string ConfigSection = "03. Eclair";
+        private static readonly string[] BindKeys = { "Strike", "Menu", "Aim" };
+
+        // Raccourcis lus dans le .cfg s'ils y sont. Pas des réglages bindés.
+        internal static KeyboardShortcut StrikeBind = KeyboardShortcut.Empty;
+        internal static KeyboardShortcut MenuBind = KeyboardShortcut.Empty;
+        internal static KeyboardShortcut AimBind = KeyboardShortcut.Empty;
 
         private static GameObject cachedPrefab;
         private static float nextStrike;
 
-        internal static void Strike()
+        internal static bool PreserveOrphan(string section, string key)
         {
-            if (ModConfig.LightningEnabled == null || !ModConfig.LightningEnabled.Value)
+            if (!string.Equals(section, ConfigSection, System.StringComparison.OrdinalIgnoreCase))
             {
-                return;
+                return false;
             }
 
+            for (int i = 0; i < BindKeys.Length; i++)
+            {
+                if (string.Equals(key, BindKeys[i], System.StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        internal static void ReadBinds(ConfigFile config)
+        {
+            StrikeBind = ReadBind(config, "Strike");
+            MenuBind = ReadBind(config, "Menu");
+            AimBind = ReadBind(config, "Aim");
+        }
+
+        private static KeyboardShortcut ReadBind(ConfigFile config, string key)
+        {
+            string raw;
+            if (config == null || !ModConfig.TryGetOrphan(config, ConfigSection, key, out raw) || string.IsNullOrWhiteSpace(raw))
+            {
+                return KeyboardShortcut.Empty;
+            }
+
+            return KeyboardShortcut.Deserialize(raw.Trim());
+        }
+
+        internal static void Strike()
+        {
             Player player = Util.ActingPlayer();
             if (!player)
             {
@@ -39,10 +78,7 @@ namespace Qmod
 
             nextStrike = Time.unscaledTime + Cooldown;
 
-            if (ModConfig.LightningMessage != null && ModConfig.LightningMessage.Value)
-            {
-                player.Message(MessageHud.MessageType.Center, SuccessToken, 0, null, false);
-            }
+            player.Message(MessageHud.MessageType.Center, SuccessToken, 0, null, false);
 
             Play(player.transform.position);
         }

@@ -12,7 +12,7 @@ namespace Qmod
     {
         public const string PluginGUID = "com.aeons.qmod";
         public const string PluginName = "Qmod";
-        public const string PluginVersion = "1.0.79";
+        public const string PluginVersion = "1.0.83";
 
         internal static Qmod Instance { get; private set; }
 
@@ -70,6 +70,7 @@ namespace Qmod
 
         private void Update()
         {
+            ChestDump.Tick();
             ModInput.Tick();
 
             if (!configReloadPending || Time.unscaledTime < reloadAt)
@@ -79,6 +80,8 @@ namespace Qmod
 
             configReloadPending = false;
             Config.Reload();
+            MagicBush.ReadBinds(Config);
+            ThorLightning.ReadBinds(Config);
             WaterShader.Refresh();
             RadiusOverride.RefreshAll();
             Jotunn.Logger.LogInfo("Config Qmod rechargée");

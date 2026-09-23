@@ -7,9 +7,11 @@ using UnityEngine;
 
 namespace Qmod
 {
-    // Rayons réglables (section 11) : confort du reposé, zones de
-    // construction établi / tailleur / artisan, et distance unique des
-    // améliorations autour des stations. 0 = vanilla (pas touché).
+    // Section 0 - options, trois rayons. 0 = vanilla.
+    // Confort : pièces du bonus reposé.
+    // Construction : m_rangeBuild de toutes les stations (forge, forge
+    // noire, établi, chaudron, Galdr, préparation, tailleur, artisan...).
+    // Améliorations : distance des extensions autour de leur station.
     // Appliqué au spawn et réappliqué en direct au reload de la config.
     internal static class RadiusOverride
     {
@@ -32,18 +34,13 @@ namespace Qmod
                 return;
             }
 
-            float? want = OverrideFor(prefab);
-            if (!want.HasValue)
-            {
-                return;
-            }
-
             if (!vanillaRanges.ContainsKey(prefab))
             {
                 vanillaRanges[prefab] = station.m_rangeBuild;
             }
 
-            float target = want.Value <= 0f ? vanillaRanges[prefab] : want.Value;
+            float want = Radius(ModConfig.ConstructionRadius);
+            float target = want <= 0f ? vanillaRanges[prefab] : want;
             if (Mathf.Approximately(station.m_rangeBuild, target))
             {
                 return;
@@ -101,26 +98,6 @@ namespace Qmod
             {
                 extension.m_maxStationDistance = target;
             }
-        }
-
-        private static float? OverrideFor(string prefab)
-        {
-            if (prefab.IndexOf("workbench", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return Radius(ModConfig.WorkbenchRadius);
-            }
-
-            if (prefab.IndexOf("stonecutter", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return Radius(ModConfig.StonecutterRadius);
-            }
-
-            if (prefab.IndexOf("artisanstation", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return Radius(ModConfig.ArtisanRadius);
-            }
-
-            return null;
         }
 
         private static float Radius(ConfigEntry<float> entry)

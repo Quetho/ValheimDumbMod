@@ -16,6 +16,9 @@ namespace Qmod
     // Fonctionnement en deux temps : scan + plan (quantités dispos, place
     // libre) sans rien toucher, puis transfert avec attente d'ownership
     // (indispensable côté client sur serveur dédié) et synchro ZDO.
+    // Le scan (aussi utilisé par le marteau et le rangement) ne garde un
+    // coffre que s'il a été posé par le joueur. Poseur inconnu : refus si
+    // une balise active d'un autre joueur couvre le coffre.
     internal static class ChestPull
     {
         private const float OwnershipTimeout = 2f;
@@ -49,7 +52,6 @@ namespace Qmod
         private static readonly List<ItemDrop.ItemData> foundStacks = new List<ItemDrop.ItemData>();
         private static readonly List<ItemDrop.ItemData> playerStacks = new List<ItemDrop.ItemData>();
         internal static readonly List<Container> nearbyChests = new List<Container>();
-        private static readonly HashSet<Container> seenChests = new HashSet<Container>();
         private static readonly HashSet<Container> touchedChests = new HashSet<Container>();
         private static readonly List<PullPlan> plans = new List<PullPlan>();
 
@@ -276,7 +278,7 @@ namespace Qmod
             }
         }
 
-        private static Sprite FindChestIcon()
+        internal static Sprite FindChestIcon()
         {
             for (int i = 0; i < ChestIconPrefabs.Length; i++)
             {
@@ -687,7 +689,7 @@ namespace Qmod
 
         internal static void PullMissing()
         {
-            if (ModConfig.CraftPullEnabled == null || !ModConfig.CraftPullEnabled.Value || pullRunning)
+            if (ModConfig.CraftPullEnabled == null || !ModConfig.CraftPullEnabled.Value || pullRunning || ChestDump.IsRunning())
             {
                 return;
             }
@@ -752,7 +754,7 @@ namespace Qmod
         // Les coffres doivent déjà être scannés (GatherChests par l'appelant).
         internal static void PullForPieces(Piece piece, int count, Action onDone)
         {
-            if (pullRunning || piece == null || piece.m_resources == null)
+            if (pullRunning || ChestDump.IsRunning() || piece == null || piece.m_resources == null)
             {
                 return;
             }
@@ -798,8 +800,15 @@ namespace Qmod
 
         internal static int GatherChests(Vector3 center, float radius, long playerId, bool verbose)
         {
-            nearbyChests.Clear();
-            seenChests.Clear();
+            return GatherChests(center, radius, playerId, verbose, nearbyChests);
+        }
+
+        // dest est vidé. Le pull et le dump passent chacun leur liste : le
+        // tooltip ne doit pas effacer les coffres d'un transfert en cours.
+        internal static int GatherChests(Vector3 center, float radius, long playerId, bool verbose, List<Container> dest)
+        {
+            dest.Clear();
+            HashSet<Container> seen = new HashSet<Container>();
             // Pas de OverlapSphere : le buffer sature dans les grosses bases et
             // des coffres sont ratés. Énumération directe (déclenchée au clic).
             Container[] all = UnityEngine.Object.FindObjectsByType<Container>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
@@ -809,10 +818,12 @@ namespace Qmod
             int guard = 0;
             int access = 0;
             int inUse = 0;
+            int notOwner = 0;
+            LastOwnerRejects = 0;
             for (int i = 0; i < all.Length; i++)
             {
                 Container container = all[i];
-                if (!container || !seenChests.Add(container))
+                if (!container || !seen.Add(container))
                 {
                     continue;
                 }
@@ -839,6 +850,12 @@ namespace Qmod
                 if (!container.CheckAccess(playerId))
                 {
                     access++;
+                    continue;
+                }
+
+                if (!PlacedByPlayer(container, playerId))
+                {
+                    notOwner++;
                     continue;
                 }
 
@@ -877,17 +894,67 @@ namespace Qmod
                         " owner=" + container.m_nview.IsOwner());
                 }
 
-                nearbyChests.Add(container);
+                dest.Add(container);
             }
 
+            LastOwnerRejects = notOwner;
             if (verbose)
             {
                 Jotunn.Logger.LogInfo("ChestPull: scan r=" + radius + " scannés=" + all.Length +
                     " loin=" + tooFar + " invalides=" + invalid + " ward=" + guard +
-                    " acces=" + access + " inUse=" + inUse + " gardés=" + nearbyChests.Count);
+                    " acces=" + access + " poseur=" + notOwner + " inUse=" + inUse + " gardés=" + dest.Count);
             }
 
-            return nearbyChests.Count;
+            return dest.Count;
+        }
+
+        // Dernier scan : coffres écartés parce qu'un autre joueur les a posés,
+        // ou parce que le poseur est inconnu et qu'une balise étrangère couvre le point.
+        internal static int LastOwnerRejects;
+
+        // Piece.m_creator est l'id du profil qui a posé la pièce (même id que
+        // LocalPlayerId). 0 = coffre du monde ou ZDO pas encore lu.
+        private static bool PlacedByPlayer(Container container, long playerId)
+        {
+            if (!container || playerId == 0L)
+            {
+                return false;
+            }
+
+            Piece piece = container.m_piece;
+            long creator = piece ? piece.GetCreator() : 0L;
+            if (creator != 0L)
+            {
+                return creator == playerId;
+            }
+
+            return !InsideForeignWard(container.transform.position, playerId);
+        }
+
+        private static bool InsideForeignWard(Vector3 point, long playerId)
+        {
+            List<PrivateArea> areas = PrivateArea.m_allAreas;
+            if (areas == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < areas.Count; i++)
+            {
+                PrivateArea area = areas[i];
+                if (!area || !area.IsEnabled() || !area.IsInside(point, 0f))
+                {
+                    continue;
+                }
+
+                long owner = area.m_piece ? area.m_piece.GetCreator() : 0L;
+                if (owner != playerId)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         internal static PullPlan PlanRequirement(Inventory playerInv, Piece.Requirement req, int quality, int multiplier = 1)

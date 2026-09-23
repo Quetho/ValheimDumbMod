@@ -7,7 +7,7 @@ namespace Qmod
     {
         internal static void Tick()
         {
-            if (Pressed(ModConfig.ToggleTpMenu))
+            if (Pressed(ThorLightning.MenuBind))
             {
                 ThorTp.Toggle();
                 return;
@@ -21,6 +21,11 @@ namespace Qmod
                 }
 
                 return;
+            }
+
+            if (DumpAllowed() && Pressed(ModConfig.ChestDump))
+            {
+                ChestDump.TryDump();
             }
 
             if (Util.IsMenuBlocking())
@@ -75,24 +80,19 @@ namespace Qmod
                 Toggle(ModConfig.CultivateHarvestEnabled, "Récolte cultivateur");
             }
 
-            if (Pressed(ModConfig.ToggleMagicBush))
+            if (Pressed(MagicBush.ToggleBind))
             {
                 MagicBush.Toggle();
             }
 
-            if (Pressed(ModConfig.StrikeLightning))
+            if (Pressed(ThorLightning.StrikeBind))
             {
                 ThorLightning.Strike();
             }
 
-            if (Pressed(ModConfig.AimLightning))
+            if (Pressed(ThorLightning.AimBind))
             {
                 ThorBolt.Cast();
-            }
-
-            if (Pressed(ModConfig.SpawnBoar))
-            {
-                BoarSpawn.Spawn();
             }
 
             if (Pressed(ModConfig.ToggleHugin))
@@ -101,25 +101,35 @@ namespace Qmod
             }
         }
 
-        private static bool Pressed(ConfigEntry<KeyboardShortcut> entry)
+        // L'inventaire ouvert ne bloque pas le rangement. Le menu pause et le chat oui.
+        private static bool DumpAllowed()
         {
-            if (entry == null)
+            if (Menu.IsVisible() || Menu.IsActive())
             {
                 return false;
             }
 
-            KeyboardShortcut shortcut = entry.Value;
+            Chat chat = Chat.instance;
+            return !chat || !chat.HasFocus();
+        }
+
+        private static bool Pressed(ConfigEntry<KeyboardShortcut> entry)
+        {
+            return entry != null && Pressed(entry.Value);
+        }
+
+        private static bool Pressed(KeyboardShortcut shortcut)
+        {
             return shortcut.MainKey != KeyCode.None && shortcut.IsDown();
         }
 
         internal static bool Held(ConfigEntry<KeyboardShortcut> entry)
         {
-            if (entry == null)
-            {
-                return false;
-            }
+            return entry != null && Held(entry.Value);
+        }
 
-            KeyboardShortcut shortcut = entry.Value;
+        internal static bool Held(KeyboardShortcut shortcut)
+        {
             return shortcut.MainKey != KeyCode.None && shortcut.IsPressed();
         }
 
