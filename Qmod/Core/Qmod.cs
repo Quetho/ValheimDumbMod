@@ -12,7 +12,7 @@ namespace Qmod
     {
         public const string PluginGUID = "com.aeons.qmod";
         public const string PluginName = "Qmod";
-        public const string PluginVersion = "1.0.83";
+        public const string PluginVersion = "1.0.84";
 
         internal static Qmod Instance { get; private set; }
 
