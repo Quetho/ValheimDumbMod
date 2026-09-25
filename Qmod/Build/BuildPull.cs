@@ -8,7 +8,8 @@ namespace Qmod
 {
     // Menu marteau (BuildUi) : après 1 s de survol maintenu, le panneau bas
     // affiche le stock coffres par ressource ; clic droit sur une pièce =
-    // pull pour x10 (ou le max < 10 que les coffres couvrent), sans fermer.
+    // pull pour x1, Shift + clic droit = pull pour x10 (ou le max < 10 que
+    // les coffres couvrent), sans fermer.
     // Clic droit hors item : fermeture vanilla inchangée. Le clic droit est
     // sondé globalement par BuildUi.NavigationUpdate (bouton "BuildMenu"),
     // sans handler par bouton : on l'intercepte là quand un bouton est
@@ -163,7 +164,8 @@ namespace Qmod
 
         // true = pull pris en charge (le natif ne doit pas tourner).
         // La pièce vient du jeu au moment du clic, pas du suivi (fraîcheur).
-        internal static bool TryPull(Piece hovered, List<BuildUiPieceButton> buttons, BuildUiPieceButton special)
+        // bulk (Shift maintenu) = jusqu'à x10, sinon x1.
+        internal static bool TryPull(Piece hovered, List<BuildUiPieceButton> buttons, BuildUiPieceButton special, bool bulk)
         {
             if (!IsEnabled)
             {
@@ -183,7 +185,7 @@ namespace Qmod
             }
 
             ChestPull.GatherChests(player.transform.position, ChestPull.PullScanRadius(), ChestPull.LocalPlayerId(), true);
-            int count = BestCount(player, piece);
+            int count = BestCount(player, piece, bulk ? MaxPullCount : 1);
             if (count <= 0)
             {
                 Util.NotifyPlayer(player, "Rien à récupérer dans les coffres proches");
@@ -230,7 +232,7 @@ namespace Qmod
             }
         }
 
-        private static int BestCount(Player player, Piece piece)
+        private static int BestCount(Player player, Piece piece, int maxCount)
         {
             Inventory playerInv = player.GetInventory();
             if (playerInv == null)
@@ -238,7 +240,7 @@ namespace Qmod
                 return 0;
             }
 
-            for (int count = MaxPullCount; count >= 1; count--)
+            for (int count = Mathf.Min(maxCount, MaxPullCount); count >= 1; count--)
             {
                 if (ChestsCover(playerInv, piece, count))
                 {
@@ -331,10 +333,16 @@ namespace Qmod
             }
         }
 
+        private static bool IsShiftDown()
+        {
+            return Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+        }
+
         // Clic droit (bouton "BuildMenu") sondé par frame : si un bouton de
-        // pièce est survolé et le dropdown favoris fermé, on pull et on
-        // bloque la fermeture vanilla. Sinon on laisse passer (fermeture,
-        // dropdown, Escape, manette : inchangés). Le survol live est déjà
+        // pièce est survolé et le dropdown favoris fermé, on pull (x1, x10
+        // avec Shift) et on bloque la fermeture vanilla. Sinon on laisse
+        // passer (fermeture, dropdown, Escape, manette : inchangés).
+        // Le survol live est déjà
         // effacé au moment du sondage (désélection du clic traitée avant)
         // donc on accepte aussi le dernier survolé effacé sur cette frame.
         [HarmonyPatch(typeof(BuildUi), "NavigationUpdate")]
@@ -373,8 +381,9 @@ namespace Qmod
                     return true;
                 }
 
-                Jotunn.Logger.LogInfo("BuildPull: clic droit, survol=" + Util.GetPrefabName(piece.gameObject));
-                return !TryPull(piece, ___m_pieceButtons, ___m_specialPieceButton);
+                bool bulk = IsShiftDown();
+                Jotunn.Logger.LogInfo("BuildPull: clic droit" + (bulk ? " +Shift" : "") + ", survol=" + Util.GetPrefabName(piece.gameObject));
+                return !TryPull(piece, ___m_pieceButtons, ___m_specialPieceButton, bulk);
             }
         }
 

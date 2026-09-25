@@ -105,7 +105,7 @@ namespace Qmod
 
         private static void BindGraphics(ConfigFile config)
         {
-            SupersamplingEnabled = config.Bind(Graphics, "SupersamplingEnabled", true,
+            SupersamplingEnabled = config.Bind(Graphics, "SupersamplingEnabled", false,
                 "Rendu interne plus net (SSAA), puis réduit à l'écran. Plus gourmand");
             SupersamplingScale = config.Bind(Graphics, "SupersamplingScale", 1.5f,
                 new ConfigDescription("Multiplicateur de résolution interne. 1 = off, 1.5 = 150 %, 2 = 200 %",
@@ -155,7 +155,7 @@ namespace Qmod
 
         private static void BindCamera(ConfigFile config)
         {
-            YoteiCameraEnabled = config.Bind(Camera, "YoteiCameraEnabled", true,
+            YoteiCameraEnabled = config.Bind(Camera, "YoteiCameraEnabled", false,
                 "Caméra type Ghost of Yotei (épaule, recul, FOV sprint, zoom combat)");
             YoteiAutoShoulder = config.Bind(Camera, "YoteiAutoShoulder", true,
                 "Épaule gauche/droite selon murs, déplacement et regard");
@@ -190,7 +190,7 @@ namespace Qmod
             FreePlacementEnabled = config.Bind(Options, "FreePlacementEnabled", true,
                 "Les pièces peuvent se croiser / se chevaucher (fantôme vert) et les points d'ancrage restent actifs sur un emplacement déjà occupé. S'applique aussi au terrain");
             BuildPullEnabled = config.Bind(Options, "BuildPullEnabled", true,
-                "Menu marteau : stock coffres affiché après 1 s de survol, clic droit sur une pièce = pull pour x10 (ou le max couvert). Rayon : CraftPullRadius");
+                "Menu marteau : stock coffres affiché après 1 s de survol, clic droit sur une pièce = pull pour x1, Shift + clic droit = pull pour x10 (ou le max couvert). Rayon : CraftPullRadius");
         }
 
         private static void BindMounts(ConfigFile config)
