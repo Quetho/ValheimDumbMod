@@ -752,6 +752,8 @@ namespace Qmod
 
         // Pull pour une pièce de construction (menu marteau), quantité count.
         // Les coffres doivent déjà être scannés (GatherChests par l'appelant).
+        // Tout ou rien : si une ressource manquante n'est pas couverte
+        // intégralement (stock coffres ou place inventaire), rien n'est pris.
         internal static void PullForPieces(Piece piece, int count, Action onDone)
         {
             if (pullRunning || ChestDump.IsRunning() || piece == null || piece.m_resources == null)
@@ -781,6 +783,14 @@ namespace Qmod
             if (totalTake <= 0)
             {
                 ReportShortage(player, plans);
+                plans.Clear();
+                return;
+            }
+
+            string refuseReason = AllOrNothingRefusal(plans, count);
+            if (refuseReason != null)
+            {
+                Util.NotifyPlayer(player, refuseReason);
                 plans.Clear();
                 return;
             }
@@ -1248,6 +1258,44 @@ namespace Qmod
                 Jotunn.Logger.LogInfo("ChestPull: plan " + plans[i].ResName + " faut=" + plans[i].Need + " ont=" + plans[i].Have +
                     " manque=" + plans[i].Missing + " dispos=" + plans[i].Available + " place=" + plans[i].Space);
             }
+        }
+
+        // Tout ou rien (menu marteau) : null si chaque ressource manquante
+        // est couverte intégralement (Take == Missing), sinon le message de
+        // refus. Le manque de stock prime sur le manque de place.
+        internal static string AllOrNothingRefusal(List<PullPlan> current, int count)
+        {
+            bool shortStock = false;
+            bool shortSpace = false;
+            for (int i = 0; i < current.Count; i++)
+            {
+                PullPlan plan = current[i];
+                if (plan.Missing <= 0 || plan.Take >= plan.Missing)
+                {
+                    continue;
+                }
+
+                if (plan.Available < plan.Missing)
+                {
+                    shortStock = true;
+                }
+                else
+                {
+                    shortSpace = true;
+                }
+            }
+
+            if (shortStock)
+            {
+                return "Coffres insuffisants pour x" + count + " : rien pris";
+            }
+
+            if (shortSpace)
+            {
+                return "Inventaire plein";
+            }
+
+            return null;
         }
 
         internal static void ReportShortage(Player player, List<PullPlan> current)

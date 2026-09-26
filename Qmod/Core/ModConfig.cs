@@ -190,7 +190,7 @@ namespace Qmod
             FreePlacementEnabled = config.Bind(Options, "FreePlacementEnabled", true,
                 "Les pièces peuvent se croiser / se chevaucher (fantôme vert) et les points d'ancrage restent actifs sur un emplacement déjà occupé. S'applique aussi au terrain");
             BuildPullEnabled = config.Bind(Options, "BuildPullEnabled", true,
-                "Menu marteau : stock coffres affiché après 1 s de survol, clic droit sur une pièce = pull pour x1, Shift + clic droit = pull pour x10 (ou le max couvert). Rayon : CraftPullRadius");
+                "Menu marteau : stock coffres affiché après 1 s de survol, clic droit sur une pièce = pull pour x1, Shift + clic droit = pull pour x5 (tout ou rien : rien pris si stock ou place insuffisants). Rayon : CraftPullRadius");
         }
 
         private static void BindMounts(ConfigFile config)
