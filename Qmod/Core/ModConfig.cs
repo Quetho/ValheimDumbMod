@@ -34,8 +34,11 @@ namespace Qmod
         internal static ConfigEntry<bool> StatusHudEnabled;
         internal static ConfigEntry<bool> UnarmedHudHideEnabled;
         internal static ConfigEntry<float> UnarmedHudHideDelay;
+        internal static ConfigEntry<bool> UnarmedHudKeepCrosshair;
+        internal static ConfigEntry<bool> UnarmedHudKeepStamina;
         internal static ConfigEntry<bool> HuginDisabled;
         internal static ConfigEntry<bool> FireplaceSmokeEnabled;
+        internal static ConfigEntry<bool> BuildStabilityHudEnabled;
         internal static ConfigEntry<KeyboardShortcut> ToggleStatusHud;
         internal static ConfigEntry<KeyboardShortcut> ToggleUnarmedHudHide;
         internal static ConfigEntry<KeyboardShortcut> ToggleHugin;
@@ -144,10 +147,16 @@ namespace Qmod
                 "Cache le HUD si aucune arme/outil en main pendant UnarmedHudHideDelay secondes");
             UnarmedHudHideDelay = config.Bind(Hud, "UnarmedHudHideDelay", 10f,
                 new ConfigDescription("Délai avant de cacher le HUD (mains vides)", new AcceptableValueRange<float>(1f, 60f)));
+            UnarmedHudKeepCrosshair = config.Bind(Hud, "UnarmedHudKeepCrosshair", false,
+                "Masquage HUD mains vides : garder le crosshair visible");
+            UnarmedHudKeepStamina = config.Bind(Hud, "UnarmedHudKeepStamina", false,
+                "Masquage HUD mains vides : garder la barre d'endurance visible");
             HuginDisabled = config.Bind(Hud, "HuginDisabled", true,
                 "Empêche Hugin de spawn et de rejouer les tutos. Munin n'est pas touché");
             FireplaceSmokeEnabled = config.Bind(Hud, "FireplaceSmokeEnabled", true,
                 "Affiche l'évacuation de la fumée (évacuée / bloquée) dans le survol des feux");
+            BuildStabilityHudEnabled = config.Bind(Hud, "BuildStabilityHudEnabled", true,
+                "Mode build : affiche à droite du crosshair la stabilité de la pièce visée");
             ToggleStatusHud = BindKey(config, Hud, "ToggleStatusHud", "Afficher/masquer le HUD des effets");
             ToggleUnarmedHudHide = BindKey(config, Hud, "ToggleUnarmedHudHide", "Activer/désactiver le masquage HUD mains vides");
             ToggleHugin = BindKey(config, Hud, "ToggleHugin", "Activer/désactiver Hugin (tutos)");

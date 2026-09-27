@@ -33,7 +33,9 @@ Requiert BepInEx et Jotunn (voir `manifest.json`).
 - **Farming** : message configurable au kill sanglier avec le butcher knife,
   spawn d'un sanglier 2 étoiles apprivoisé.
 - **HUD** : liste des bonus/malus en bas à droite, masquage auto du HUD
-  mains vides après un délai, Hugin (tutos) désactivé.
+  mains vides après un délai (options pour garder le crosshair et/ou
+  l'endurance), stabilité de la pièce visée à droite du crosshair en
+  mode build, Hugin (tutos) désactivé.
 - **Caméra** : mode Yotei (épaule auto gauche/droite, recul en exploration
   et sprint, zoom combat, FOV sprint) et caméra cinématique après
   inactivité (sujet joueur/PNJ, profondeur de champ).

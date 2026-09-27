@@ -6,6 +6,10 @@ namespace Qmod
     internal static class UnarmedHudHider
     {
         private static float unarmedTime;
+        private static Transform keepCrosshair;
+        private static Vector3 keepCrosshairOrig;
+        private static Transform keepStamina;
+        private static Vector3 keepStaminaOrig;
 
         internal static bool IsHiding { get; private set; }
 
@@ -16,6 +20,12 @@ namespace Qmod
                 return;
             }
 
+            UpdateState(hud);
+            ApplyKeepVisible(hud);
+        }
+
+        private static void UpdateState(Hud hud)
+        {
             if (!ModConfig.UnarmedHudHideEnabled.Value)
             {
                 Reset();
@@ -61,6 +71,52 @@ namespace Qmod
             }
 
             IsHiding = true;
+        }
+
+        // Le masquage déplace m_rootObject hors écran (Hud.SetVisible) au
+        // lieu de le désactiver : chaque élément "gardé" est re-compensé
+        // par frame (position d'origine moins le décalage live du root).
+        // Hors masquage, la position d'origine est restaurée. La cinématique
+        // garde le masquage total (pas de compensation). Le crosshair d'arc
+        // est ignoré : arc en main = pas de masquage de toute façon.
+        private static void ApplyKeepVisible(Hud hud)
+        {
+            bool hiding = IsHiding && !CinematicIdleCamera.IsActive;
+            Vector3 shift = Vector3.zero;
+            if (hud.m_rootObject)
+            {
+                shift = hud.m_rootObject.transform.localPosition;
+            }
+
+            Transform cross = hud.m_crosshair ? hud.m_crosshair.transform : null;
+            ApplyKeptElement(ref keepCrosshair, ref keepCrosshairOrig, cross, shift,
+                hiding && ModConfig.UnarmedHudKeepCrosshair.Value);
+
+            Transform stamina = hud.m_staminaBar2Root ? hud.m_staminaBar2Root.transform : null;
+            ApplyKeptElement(ref keepStamina, ref keepStaminaOrig, stamina, shift,
+                hiding && ModConfig.UnarmedHudKeepStamina.Value);
+        }
+
+        private static void ApplyKeptElement(ref Transform cached, ref Vector3 orig, Transform current, Vector3 shift, bool keep)
+        {
+            if (keep && current)
+            {
+                if (cached != current)
+                {
+                    cached = current;
+                    orig = current.localPosition;
+                }
+
+                current.localPosition = orig - shift;
+                return;
+            }
+
+            if (cached)
+            {
+                cached.localPosition = orig;
+            }
+
+            cached = null;
         }
 
         [HarmonyPatch(typeof(Hud), "SetVisible")]

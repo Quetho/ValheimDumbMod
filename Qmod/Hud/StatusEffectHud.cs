@@ -105,7 +105,7 @@ namespace Qmod
             outline.effectDistance = new Vector2(1f, -1f);
         }
 
-        private static Font ResolveFont(Hud hud)
+        internal static Font ResolveFont(Hud hud)
         {
             foreach (Text existing in hud.GetComponentsInChildren<Text>(true))
             {
