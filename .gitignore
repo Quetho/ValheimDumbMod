@@ -375,3 +375,6 @@ Environment.props
 # not the generated dll for thunderstore
 */Package/plugins/*
 AGENTS.MD
+
+# notes de recherche locales (caméra, etc.)
+research/

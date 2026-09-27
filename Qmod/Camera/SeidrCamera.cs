@@ -121,7 +121,6 @@ namespace Qmod
             dungeonProbeTimer = 0f;
             leadLat = 0f;
             leadFwd = 0f;
-            fovTarget = 0f;
             pitchDrift = 0f;
             trauma = 0f;
             prevVy = 0f;
@@ -576,8 +575,19 @@ namespace Qmod
                     if (ModConfig.CameraMode != null && ModConfig.CameraMode.Value == ShoulderCameraMode.Seidr
                         && !CinematicIdleCamera.IsActive)
                     {
-                        fovTarget = Mathf.MoveTowards(fovTarget, __instance.m_fovBase, Time.deltaTime * FovFadeRate);
-                        CameraUtil.ApplyTempFov(__instance, fovTarget, ref appliedFov);
+                        // Arc / lit / build : rendre le FOV à vanilla. On ne
+                        // drive que si on l'avait déjà pris. Un fovTarget à 0
+                        // passé à SetTempFOV fait osciller m_fov (inertie 1.6)
+                        // jusqu'à la fin du tir.
+                        if (appliedFov && fovTarget > 1f)
+                        {
+                            fovTarget = Mathf.MoveTowards(fovTarget, __instance.m_fovBase, Time.deltaTime * FovFadeRate);
+                            CameraUtil.ApplyTempFov(__instance, fovTarget, ref appliedFov);
+                        }
+                        else
+                        {
+                            CameraUtil.ClearTempFov(__instance, ref appliedFov);
+                        }
                     }
                     else
                     {
