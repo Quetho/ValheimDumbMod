@@ -18,7 +18,7 @@ namespace Qmod
 
         internal static bool IsMenuBlocking()
         {
-            if (Menu.IsVisible() || Menu.IsActive() || InventoryGui.IsVisible())
+            if (Menu.IsVisible() || Menu.IsActive() || InventoryGui.IsVisible() || Minimap.IsOpen())
             {
                 return true;
             }

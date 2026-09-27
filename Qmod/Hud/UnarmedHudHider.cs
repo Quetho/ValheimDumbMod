@@ -10,6 +10,8 @@ namespace Qmod
         private static Vector3 keepCrosshairOrig;
         private static Transform keepStamina;
         private static Vector3 keepStaminaOrig;
+        private static Transform keepMap;
+        private static Vector3 keepMapOrig;
 
         internal static bool IsHiding { get; private set; }
 
@@ -79,6 +81,8 @@ namespace Qmod
         // Hors masquage, la position d'origine est restaurée. La cinématique
         // garde le masquage total (pas de compensation). Le crosshair d'arc
         // est ignoré : arc en main = pas de masquage de toute façon.
+        // Minimap petite : UnarmedHudKeepMap, si enfant d'un root décalé
+        // (HUD / Menu). Grande map : Minimap.IsOpen() débloque le HUD.
         private static void ApplyKeepVisible(Hud hud)
         {
             bool hiding = IsHiding && !CinematicIdleCamera.IsActive;
@@ -95,6 +99,37 @@ namespace Qmod
             Transform stamina = hud.m_staminaBar2Root ? hud.m_staminaBar2Root.transform : null;
             ApplyKeptElement(ref keepStamina, ref keepStaminaOrig, stamina, shift,
                 hiding && ModConfig.UnarmedHudKeepStamina.Value);
+
+            Transform map = SmallMapTransform();
+            ApplyKeptElement(ref keepMap, ref keepMapOrig, map, shift,
+                hiding && ModConfig.UnarmedHudKeepMap.Value && IsUnderShiftedRoot(map, hud));
+        }
+
+        private static Transform SmallMapTransform()
+        {
+            Minimap map = Minimap.instance;
+            if (!map || !map.m_smallRoot)
+            {
+                return null;
+            }
+
+            return map.m_smallRoot.transform;
+        }
+
+        private static bool IsUnderShiftedRoot(Transform t, Hud hud)
+        {
+            if (!t)
+            {
+                return false;
+            }
+
+            if (hud && hud.m_rootObject && t.IsChildOf(hud.m_rootObject.transform))
+            {
+                return true;
+            }
+
+            Menu menu = Menu.instance;
+            return menu && menu.m_root && t.IsChildOf(menu.m_root);
         }
 
         private static void ApplyKeptElement(ref Transform cached, ref Vector3 orig, Transform current, Vector3 shift, bool keep)

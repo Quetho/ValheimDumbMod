@@ -36,6 +36,7 @@ namespace Qmod
         internal static ConfigEntry<float> UnarmedHudHideDelay;
         internal static ConfigEntry<bool> UnarmedHudKeepCrosshair;
         internal static ConfigEntry<bool> UnarmedHudKeepStamina;
+        internal static ConfigEntry<bool> UnarmedHudKeepMap;
         internal static ConfigEntry<bool> HuginDisabled;
         internal static ConfigEntry<bool> FireplaceSmokeEnabled;
         internal static ConfigEntry<bool> BuildStabilityHudEnabled;
@@ -43,8 +44,17 @@ namespace Qmod
         internal static ConfigEntry<KeyboardShortcut> ToggleUnarmedHudHide;
         internal static ConfigEntry<KeyboardShortcut> ToggleHugin;
 
-        internal static ConfigEntry<bool> YoteiCameraEnabled;
-        internal static ConfigEntry<bool> YoteiAutoShoulder;
+        internal static ConfigEntry<ShoulderCameraMode> CameraMode;
+        internal static ConfigEntry<float> SeidrIdleDelay;
+        internal static ConfigEntry<float> SeidrSway;
+        internal static ConfigEntry<float> SeidrShoulderOffset;
+        internal static ConfigEntry<float> SeidrDistanceBoost;
+        internal static ConfigEntry<float> SeidrSprintDistance;
+        internal static ConfigEntry<float> SeidrCombatZoom;
+        internal static ConfigEntry<float> SeidrHeightOffset;
+        internal static ConfigEntry<float> SeidrSmoothness;
+        internal static ConfigEntry<float> SeidrSprintFov;
+        internal static ConfigEntry<float> SeidrInteriorHeight;
         internal static ConfigEntry<float> YoteiShoulderOffset;
         internal static ConfigEntry<float> YoteiDistanceBoost;
         internal static ConfigEntry<float> YoteiSprintDistance;
@@ -151,6 +161,8 @@ namespace Qmod
                 "Masquage HUD mains vides : garder le crosshair visible");
             UnarmedHudKeepStamina = config.Bind(Hud, "UnarmedHudKeepStamina", false,
                 "Masquage HUD mains vides : garder la barre d'endurance visible");
+            UnarmedHudKeepMap = config.Bind(Hud, "UnarmedHudKeepMap", false,
+                "Masquage HUD mains vides : garder la minimap visible");
             HuginDisabled = config.Bind(Hud, "HuginDisabled", true,
                 "Empêche Hugin de spawn et de rejouer les tutos. Munin n'est pas touché");
             FireplaceSmokeEnabled = config.Bind(Hud, "FireplaceSmokeEnabled", true,
@@ -164,10 +176,12 @@ namespace Qmod
 
         private static void BindCamera(ConfigFile config)
         {
-            YoteiCameraEnabled = config.Bind(Camera, "YoteiCameraEnabled", false,
-                "Caméra type Ghost of Yotei (épaule, recul, FOV sprint, zoom combat)");
-            YoteiAutoShoulder = config.Bind(Camera, "YoteiAutoShoulder", true,
-                "Épaule gauche/droite selon murs, déplacement et regard");
+            CameraMode = config.Bind(Camera, "CameraMode", MigratedCameraMode(config),
+                "Mode caméra : Off = vanilla, Yotei = épaule fixe (swap manuel), AutoShoulder = base Yotei + épaule auto (murs, déplacement, regard), Seidr = contextuelle (combat, sprint, mystique)");
+            SeidrIdleDelay = config.Bind(Camera, "SeidrIdleDelay", 8f,
+                new ConfigDescription("Secondes sans input avant la dérive mystique (Seidr)", new AcceptableValueRange<float>(2f, 60f)));
+            SeidrSway = config.Bind(Camera, "SeidrSway", 1f,
+                new ConfigDescription("Amplitude du souffle caméra Seidr (respiration, dérive, roulis). 0 = rigide", new AcceptableValueRange<float>(0f, 2f)));
             YoteiShoulderOffset = config.Bind(Camera, "YoteiShoulderOffset", 0.42f,
                 new ConfigDescription("Amplitude du décalage d'épaule", new AcceptableValueRange<float>(0f, 1.2f)));
             YoteiDistanceBoost = config.Bind(Camera, "YoteiDistanceBoost", 0.7f,
@@ -182,16 +196,67 @@ namespace Qmod
                 new ConfigDescription("Lissage (plus haut = plus réactif)", new AcceptableValueRange<float>(1f, 20f)));
             YoteiSprintFov = config.Bind(Camera, "YoteiSprintFov", 8f,
                 new ConfigDescription("FOV ajouté en sprint", new AcceptableValueRange<float>(0f, 20f)));
+            // Seidr : réglages 100 % propres, plus rien de partagé avec Yotei.
+            // Première install : héritage one-shot des valeurs Yotei déjà
+            // chargées (défaut du Bind), ensuite chaque mode vit sa vie.
+            SeidrShoulderOffset = config.Bind(Camera, "SeidrShoulderOffset", YoteiShoulderOffset.Value,
+                new ConfigDescription("Seidr : amplitude du décalage d'épaule", new AcceptableValueRange<float>(0f, 1.2f)));
+            SeidrDistanceBoost = config.Bind(Camera, "SeidrDistanceBoost", YoteiDistanceBoost.Value,
+                new ConfigDescription("Seidr : recul en exploration", new AcceptableValueRange<float>(0f, 3f)));
+            SeidrSprintDistance = config.Bind(Camera, "SeidrSprintDistance", YoteiSprintDistance.Value,
+                new ConfigDescription("Seidr : recul supplémentaire en sprint", new AcceptableValueRange<float>(0f, 3f)));
+            SeidrCombatZoom = config.Bind(Camera, "SeidrCombatZoom", YoteiCombatZoom.Value,
+                new ConfigDescription("Seidr : rapprochement au combat", new AcceptableValueRange<float>(0f, 2f)));
+            SeidrHeightOffset = config.Bind(Camera, "SeidrHeightOffset", -0.55f,
+                new ConfigDescription("Seidr : hauteur extra hors intérieur, relative aux yeux (plus bas = hanche)",
+                    new AcceptableValueRange<float>(-1.2f, 1f)));
+            SeidrSmoothness = config.Bind(Camera, "SeidrSmoothness", YoteiSmoothness.Value,
+                new ConfigDescription("Seidr : lissage (plus haut = plus réactif)", new AcceptableValueRange<float>(1f, 20f)));
+            SeidrSprintFov = config.Bind(Camera, "SeidrSprintFov", YoteiSprintFov.Value,
+                new ConfigDescription("Seidr : FOV ajouté en sprint", new AcceptableValueRange<float>(0f, 20f)));
+            SeidrInteriorHeight = config.Bind(Camera, "SeidrInteriorHeight", -0.95f,
+                new ConfigDescription("Seidr : hauteur à l'intérieur / au serré, relative aux yeux (hanche ≈ -0.95, tête ≈ 0)",
+                    new AcceptableValueRange<float>(-1.5f, 0.5f)));
             CinematicIdleEnabled = config.Bind(Camera, "CinematicIdleEnabled", true,
                 "Caméra cinématique après un temps sans input");
             CinematicIdleDelay = config.Bind(Camera, "CinematicIdleDelay", 60f,
                 new ConfigDescription("Secondes sans input avant la cinématique", new AcceptableValueRange<float>(10f, 300f)));
             CinematicSubjectRadius = config.Bind(Camera, "CinematicSubjectRadius", 40f,
                 new ConfigDescription("Rayon (m) pour trouver un PNJ, monstre ou animal comme sujet", new AcceptableValueRange<float>(10f, 150f)));
-            ToggleYoteiCamera = BindKey(config, Camera, "ToggleYoteiCamera", "Activer/désactiver la caméra Yotei");
+            ToggleYoteiCamera = BindKey(config, Camera, "ToggleYoteiCamera", "Caméra : cycle Off -> Yotei -> AutoShoulder -> Seidr");
             ToggleCinematicIdle = BindKey(config, Camera, "ToggleCinematicIdle", "Activer/désactiver la caméra cinématique idle");
             StartCinematic = BindKey(config, Camera, "StartCinematic", "Lancer tout de suite un plan cinématique");
-            SwapShoulder = BindKey(config, Camera, "SwapShoulder", "Forcer l'épaule gauche/droite (bloque l'auto ~12 s)");
+            SwapShoulder = BindKey(config, Camera, "SwapShoulder", "Forcer l'épaule gauche/droite (en AutoShoulder/Seidr, bloque l'auto ~6 s)");
+        }
+
+        // Anciennes clés YoteiCameraEnabled / YoteiAutoShoulder (non bindées
+        // donc orphelines) -> valeur par défaut du nouveau mode. Les vieilles
+        // clés sont ensuite nettoyées par ScrubOrphans.
+        private static ShoulderCameraMode MigratedCameraMode(ConfigFile config)
+        {
+            Dictionary<ConfigDefinition, string> orphans = Orphans(config);
+            if (orphans == null)
+            {
+                return ShoulderCameraMode.Off;
+            }
+
+            string rawEnabled;
+            if (!orphans.TryGetValue(new ConfigDefinition(Camera, "YoteiCameraEnabled"), out rawEnabled) ||
+                rawEnabled == null ||
+                !rawEnabled.Trim().Equals("true", StringComparison.OrdinalIgnoreCase))
+            {
+                return ShoulderCameraMode.Off;
+            }
+
+            string rawAuto;
+            if (orphans.TryGetValue(new ConfigDefinition(Camera, "YoteiAutoShoulder"), out rawAuto) &&
+                rawAuto != null &&
+                rawAuto.Trim().Equals("false", StringComparison.OrdinalIgnoreCase))
+            {
+                return ShoulderCameraMode.Yotei;
+            }
+
+            return ShoulderCameraMode.AutoShoulder;
         }
 
         private static void BindBuild(ConfigFile config)

@@ -34,9 +34,14 @@ Requiert BepInEx et Jotunn (voir `manifest.json`).
   spawn d'un sanglier 2 étoiles apprivoisé.
 - **HUD** : liste des bonus/malus en bas à droite, masquage auto du HUD
   mains vides après un délai, Hugin (tutos) désactivé.
-- **Caméra** : mode Yotei (épaule auto gauche/droite, recul en exploration
-  et sprint, zoom combat, FOV sprint) et caméra cinématique après
-  inactivité (sujet joueur/PNJ, profondeur de champ).
+- **Caméra** : modes Yotei (épaule fixe + swap manuel), AutoShoulder
+  (base Yotei + épaule auto gauche/droite : murs, déplacement, regard)
+  et Seidr (contextuelle, réglages propres : cadrée large au combat,
+  fougueuse au sprint, basse à la hanche à l'intérieur,
+  mystique à l'arrêt — dérive lente, respiration, profondeur de champ,
+  secousses dosées sur roulade et atterrissage),
+  recul en exploration et sprint, zoom combat, FOV dynamique, et caméra
+  cinématique après inactivité (sujet joueur/PNJ, profondeur de champ).
 
 Tous les toggles clavier sont non bindés par défaut : les définir dans
 le fichier de config, sections `01.` à `07.`.

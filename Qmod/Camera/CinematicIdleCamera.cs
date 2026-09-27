@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Reflection;
 using HarmonyLib;
 using UnityEngine;
 
@@ -53,18 +52,7 @@ namespace Qmod
             public Character Character;
             public float LookHeight;
         }
-        private static FieldInfo dofField;
-        private static readonly Dictionary<string, FieldInfo> dofPropFields = new Dictionary<string, FieldInfo>();
-        private static bool dofSaved;
-        private static bool dofWasEnabled;
-        private static bool dofWasAutoFocus;
-        private static bool dofWasForced;
-        private static object dofComponent;
-        private static float savedBlur;
-        private static float savedFocalSize;
-        private static float savedAperture;
-        private static float savedFocalLength;
-        private static object savedFocalTransform;
+        private static readonly CameraDof cinematicDof = new CameraDof();
 
         internal static bool IsActive { get; private set; }
 
@@ -90,7 +78,7 @@ namespace Qmod
                 return;
             }
 
-            if (HasPlayerInput())
+            if (CameraUtil.HasPlayerInput(ignoreInputUntilFrame))
             {
                 Stop(resetIdle: true);
                 return;
@@ -346,11 +334,10 @@ namespace Qmod
         {
             if (IsActive)
             {
-                RestoreDof();
+                cinematicDof.Restore(CameraEffects.instance);
             }
 
             IsActive = false;
-            dofComponent = null;
             if (resetIdle)
             {
                 idleTime = 0f;
@@ -505,171 +492,18 @@ namespace Qmod
 
         private static void ApplyCinematicDof(CameraEffects effects, Player player)
         {
-            if (!effects)
+            if (!effects || !player || !cinematicDof.Capture(effects))
             {
                 return;
             }
 
-            object dof = GetDof(effects);
-            if (dof == null)
-            {
-                return;
-            }
-
-            if (!dofSaved)
-            {
-                dofWasEnabled = dof is Behaviour dofBehaviour && dofBehaviour.enabled;
-                dofWasAutoFocus = effects.m_dofAutoFocus;
-                dofWasForced = effects.m_forceDof;
-                savedBlur = GetDofFloat(dof, "maxBlurSize");
-                savedFocalSize = GetDofFloat(dof, "focalSize");
-                savedAperture = GetDofFloat(dof, "aperture");
-                savedFocalLength = GetDofFloat(dof, "focalLength");
-                savedFocalTransform = GetDofValue(dof, "focalTransform");
-                dofSaved = true;
-            }
-
-            effects.SetDof(true);
-            effects.m_forceDof = true;
-            effects.m_dofAutoFocus = false;
-            SetDofFloat(dof, "maxBlurSize", 5.2f);
-            SetDofFloat(dof, "focalSize", 0.06f);
-            SetDofFloat(dof, "aperture", 0.22f);
-            SetDofValue(dof, "focalTransform", subjectTransform ? subjectTransform : player.transform);
-            SetDofFloat(dof, "focalLength", Vector3.Distance(currentPos, GetLookAt(player)));
-            SetDofBool(dof, "highResolution", true);
-            SetDofBool(dof, "nearBlur", true);
-        }
-
-        private static void RestoreDof()
-        {
-            CameraEffects effects = CameraEffects.instance;
-            if (!dofSaved || !effects)
-            {
-                dofSaved = false;
-                return;
-            }
-
-            object dof = GetDof(effects);
-            effects.m_forceDof = dofWasForced;
-            effects.m_dofAutoFocus = dofWasAutoFocus;
-            effects.SetDof(dofWasEnabled);
-            if (dof != null)
-            {
-                SetDofFloat(dof, "maxBlurSize", savedBlur);
-                SetDofFloat(dof, "focalSize", savedFocalSize);
-                SetDofFloat(dof, "aperture", savedAperture);
-                SetDofFloat(dof, "focalLength", savedFocalLength);
-                SetDofValue(dof, "focalTransform", savedFocalTransform);
-            }
-
-            dofSaved = false;
-        }
-
-        private static object GetDof(CameraEffects effects)
-        {
-            if (dofComponent is Behaviour alive && alive)
-            {
-                return dofComponent;
-            }
-
-            dofComponent = null;
-            if (dofField == null)
-            {
-                dofField = typeof(CameraEffects).GetField("m_dof");
-            }
-
-            dofComponent = dofField != null ? dofField.GetValue(effects) : null;
-            return dofComponent;
-        }
-
-        private static float GetDofFloat(object dof, string name)
-        {
-            object value = GetDofValue(dof, name);
-            return value is float f ? f : 0f;
-        }
-
-        private static object GetDofValue(object dof, string name)
-        {
-            FieldInfo field = DofPropField(dof, name);
-            return field != null ? field.GetValue(dof) : null;
-        }
-
-        private static FieldInfo DofPropField(object dof, string name)
-        {
-            string key = dof.GetType().FullName + "#" + name;
-            FieldInfo field;
-            if (!dofPropFields.TryGetValue(key, out field))
-            {
-                field = dof.GetType().GetField(name);
-                dofPropFields[key] = field;
-            }
-
-            return field;
-        }
-
-        private static void SetDofFloat(object dof, string name, float value)
-        {
-            SetDofValue(dof, name, value);
-        }
-
-        private static void SetDofBool(object dof, string name, bool value)
-        {
-            SetDofValue(dof, name, value);
-        }
-
-        private static void SetDofValue(object dof, string name, object value)
-        {
-            FieldInfo field = DofPropField(dof, name);
-            if (field != null)
-            {
-                field.SetValue(dof, value);
-            }
-        }
-
-        private static bool HasPlayerInput()
-        {
-            if (Time.frameCount <= ignoreInputUntilFrame)
-            {
-                return false;
-            }
-
-            Vector2 mouse = ZInput.GetMouseDelta();
-            if (mouse.sqrMagnitude > 4f)
-            {
-                return true;
-            }
-
-            if (Mathf.Abs(ZInput.GetMouseScrollWheel()) > 0.01f)
-            {
-                return true;
-            }
-
-            if (ZInput.GetMouseButton(0) || ZInput.GetMouseButton(1) || ZInput.GetMouseButton(2))
-            {
-                return true;
-            }
-
-            if (ZInput.GetJoyLeftStick().sqrMagnitude > 0.05f || ZInput.GetJoyRightStick().sqrMagnitude > 0.05f)
-            {
-                return true;
-            }
-
-            if (ZInput.GetJoyLTrigger() > 0.25f || ZInput.GetJoyRTrigger() > 0.25f)
-            {
-                return true;
-            }
-
-            if (Input.anyKeyDown)
-            {
-                return true;
-            }
-
-            return ZInput.GetButton("Forward") || ZInput.GetButton("Backward") || ZInput.GetButton("Left") ||
-                   ZInput.GetButton("Right") || ZInput.GetButton("Jump") || ZInput.GetButton("Attack") ||
-                   ZInput.GetButton("SecondAttack") || ZInput.GetButton("Block") || ZInput.GetButton("Use") ||
-                   ZInput.GetButton("Hide") || ZInput.GetButton("Crouch") || ZInput.GetButton("Run") ||
-                   ZInput.GetButton("Dodge") || ZInput.GetButtonDown("Inventory") || ZInput.GetButtonDown("Map");
+            cinematicDof.Push(
+                effects,
+                5.2f,
+                0.06f,
+                0.22f,
+                subjectTransform ? subjectTransform : player.transform,
+                Vector3.Distance(currentPos, GetLookAt(player)));
         }
 
         [HarmonyPatch(typeof(GameCamera), "GetCameraPosition")]

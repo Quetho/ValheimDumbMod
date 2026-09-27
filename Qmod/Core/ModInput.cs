@@ -40,7 +40,7 @@ namespace Qmod
 
             if (Pressed(ModConfig.ToggleYoteiCamera))
             {
-                Toggle(ModConfig.YoteiCameraEnabled, "Caméra Yotei");
+                CycleCameraMode();
             }
 
             if (Pressed(ModConfig.ToggleCinematicIdle))
@@ -67,7 +67,7 @@ namespace Qmod
 
             if (Pressed(ModConfig.SwapShoulder))
             {
-                YoteiCamera.ManualSwap();
+                SwapActiveShoulder();
             }
 
             if (Pressed(ModConfig.ToggleUnarmedHudHide))
@@ -131,6 +131,55 @@ namespace Qmod
         internal static bool Held(KeyboardShortcut shortcut)
         {
             return shortcut.MainKey != KeyCode.None && shortcut.IsPressed();
+        }
+
+        private static void CycleCameraMode()
+        {
+            if (ModConfig.CameraMode == null)
+            {
+                return;
+            }
+
+            ShoulderCameraMode next;
+            switch (ModConfig.CameraMode.Value)
+            {
+                case ShoulderCameraMode.Yotei:
+                    next = ShoulderCameraMode.AutoShoulder;
+                    break;
+                case ShoulderCameraMode.AutoShoulder:
+                    next = ShoulderCameraMode.Seidr;
+                    break;
+                case ShoulderCameraMode.Seidr:
+                    next = ShoulderCameraMode.Off;
+                    break;
+                default:
+                    next = ShoulderCameraMode.Yotei;
+                    break;
+            }
+
+            ModConfig.CameraMode.Value = next;
+            Jotunn.Logger.LogInfo("Caméra : " + next);
+        }
+
+        private static void SwapActiveShoulder()
+        {
+            if (ModConfig.CameraMode == null)
+            {
+                return;
+            }
+
+            if (ModConfig.CameraMode.Value == ShoulderCameraMode.AutoShoulder)
+            {
+                AutoShoulderCamera.ManualSwap();
+            }
+            else if (ModConfig.CameraMode.Value == ShoulderCameraMode.Seidr)
+            {
+                SeidrCamera.ManualSwap();
+            }
+            else if (ModConfig.CameraMode.Value == ShoulderCameraMode.Yotei)
+            {
+                YoteiCamera.ManualSwap();
+            }
         }
 
         private static void Toggle(ConfigEntry<bool> entry, string label)
