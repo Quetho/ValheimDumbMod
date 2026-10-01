@@ -15,6 +15,7 @@ namespace Qmod
         private const string Farming = "4 - farming";
         private const string Mounts = "5 - montures";
         private const string Debug = "6 - debug";
+        private const string Transport = "7 - transport";
 
         internal static ConfigEntry<bool> SupersamplingEnabled;
         internal static ConfigEntry<float> SupersamplingScale;
@@ -55,6 +56,22 @@ namespace Qmod
         internal static ConfigEntry<float> SeidrSmoothness;
         internal static ConfigEntry<float> SeidrSprintFov;
         internal static ConfigEntry<float> SeidrInteriorHeight;
+        internal static ConfigEntry<float> HeidrShoulderOffset;
+        internal static ConfigEntry<float> HeidrDistanceBoost;
+        internal static ConfigEntry<float> HeidrCombatZoom;
+        internal static ConfigEntry<float> HeidrHeightOffset;
+        internal static ConfigEntry<float> HeidrSmoothness;
+        internal static ConfigEntry<float> HeidrViewX;
+        internal static ConfigEntry<float> HeidrViewY;
+        internal static ConfigEntry<float> HeidrDeadZone;
+        internal static ConfigEntry<float> HeidrSoftZone;
+        internal static ConfigEntry<float> HeidrSprintDistance;
+        internal static ConfigEntry<float> HeidrSprintFovRate;
+        internal static ConfigEntry<float> HeidrSprintFovMax;
+        internal static ConfigEntry<float> HeidrInteriorHeight;
+        internal static ConfigEntry<float> HeidrIdleDelay;
+        internal static ConfigEntry<float> HeidrSway;
+        internal static ConfigEntry<bool> HeidrDebug;
         internal static ConfigEntry<float> YoteiShoulderOffset;
         internal static ConfigEntry<float> YoteiDistanceBoost;
         internal static ConfigEntry<float> YoteiSprintDistance;
@@ -75,6 +92,22 @@ namespace Qmod
 
         internal static ConfigEntry<bool> WolfRideEnabled;
         internal static ConfigEntry<float> WolfRideSaddleHeight;
+
+        internal static ConfigEntry<bool> WindsurfEnabled;
+        internal static ConfigEntry<string> WindsurfCloneBase;
+        internal static ConfigEntry<string> WindsurfBoardPrefab;
+        internal static ConfigEntry<bool> WindsurfHideHull;
+        internal static ConfigEntry<float> WindsurfBoardScale;
+        internal static ConfigEntry<float> WindsurfBoardHeight;
+        internal static ConfigEntry<float> WindsurfSailForce;
+        internal static ConfigEntry<float> WindsurfSailFactor;
+        internal static ConfigEntry<float> WindsurfDragFactor;
+        internal static ConfigEntry<float> WindsurfHeelFactor;
+        internal static ConfigEntry<float> WindsurfSpeedFactor;
+        internal static ConfigEntry<float> WindsurfBalanceY;
+        internal static ConfigEntry<float> WindsurfPivotZ;
+        internal static ConfigEntry<float> WindsurfMaxPitch;
+        internal static ConfigEntry<float> WindsurfMaxRoll;
 
         internal static ConfigEntry<string> DebugUnsynchronized;
 
@@ -109,6 +142,7 @@ namespace Qmod
             BindHud(config);
             BindFarming(config);
             BindMounts(config);
+            BindTransport(config);
             BindDebug(config);
             MagicBush.ReadBinds(config);
             ThorLightning.ReadBinds(config);
@@ -177,7 +211,7 @@ namespace Qmod
         private static void BindCamera(ConfigFile config)
         {
             CameraMode = config.Bind(Camera, "CameraMode", MigratedCameraMode(config),
-                "Mode caméra : Off = vanilla, Yotei = épaule fixe (swap manuel), AutoShoulder = base Yotei + épaule auto (murs, déplacement, regard), Seidr = contextuelle (combat, sprint, mystique)");
+                "Mode caméra : Off = vanilla, Yotei = épaule fixe (swap manuel), AutoShoulder = base Yotei + épaule auto (murs, déplacement, regard), Seidr = contextuelle (combat, sprint, mystique), Heidr = prototype Composer + ownership");
             SeidrIdleDelay = config.Bind(Camera, "SeidrIdleDelay", 8f,
                 new ConfigDescription("Secondes sans input avant la dérive mystique (Seidr)", new AcceptableValueRange<float>(2f, 60f)));
             SeidrSway = config.Bind(Camera, "SeidrSway", 1f,
@@ -217,13 +251,48 @@ namespace Qmod
             SeidrInteriorHeight = config.Bind(Camera, "SeidrInteriorHeight", -0.95f,
                 new ConfigDescription("Seidr : hauteur à l'intérieur / au serré, relative aux yeux (hanche ≈ -0.95, tête ≈ 0)",
                     new AcceptableValueRange<float>(-1.5f, 0.5f)));
+            // Heidr : réglages 100 % propres, valeurs fixes (pas d'héritage Seidr).
+            HeidrShoulderOffset = config.Bind(Camera, "HeidrShoulderOffset", 0.42f,
+                new ConfigDescription("Heidr : amplitude du décalage d'épaule", new AcceptableValueRange<float>(0f, 1.2f)));
+            HeidrDistanceBoost = config.Bind(Camera, "HeidrDistanceBoost", 0.7f,
+                new ConfigDescription("Heidr : recul en exploration", new AcceptableValueRange<float>(0f, 3f)));
+            HeidrCombatZoom = config.Bind(Camera, "HeidrCombatZoom", 0.55f,
+                new ConfigDescription("Heidr : rapprochement au combat (pull-in)", new AcceptableValueRange<float>(0f, 2f)));
+            HeidrHeightOffset = config.Bind(Camera, "HeidrHeightOffset", -0.4f,
+                new ConfigDescription("Heidr : hauteur extra, relative aux yeux (poitrine ≈ -0.4, tête ≈ 0)",
+                    new AcceptableValueRange<float>(-1.2f, 1f)));
+            HeidrSmoothness = config.Bind(Camera, "HeidrSmoothness", 6.5f,
+                new ConfigDescription("Heidr : lissage Body (plus haut = plus réactif)", new AcceptableValueRange<float>(1f, 20f)));
+            HeidrViewX = config.Bind(Camera, "HeidrViewX", 0.15f,
+                new ConfigDescription("Heidr : ancrage horizontal de la tête dans le cadre (0 = centre)", new AcceptableValueRange<float>(0f, 0.3f)));
+            HeidrViewY = config.Bind(Camera, "HeidrViewY", 0.6f,
+                new ConfigDescription("Heidr : ancrage vertical de la tête dans le cadre", new AcceptableValueRange<float>(0.3f, 0.8f)));
+            HeidrDeadZone = config.Bind(Camera, "HeidrDeadZone", 0.1f,
+                new ConfigDescription("Heidr : demi-largeur de la dead zone Composer (cadre)", new AcceptableValueRange<float>(0.02f, 0.2f)));
+            HeidrSoftZone = config.Bind(Camera, "HeidrSoftZone", 0.2f,
+                new ConfigDescription("Heidr : fin de la soft zone Composer (cadre)", new AcceptableValueRange<float>(0.05f, 0.35f)));
+            HeidrSprintDistance = config.Bind(Camera, "HeidrSprintDistance", 0.85f,
+                new ConfigDescription("Heidr : recul supplémentaire en sprint", new AcceptableValueRange<float>(0f, 3f)));
+            HeidrSprintFovRate = config.Bind(Camera, "HeidrSprintFovRate", 1.2f,
+                new ConfigDescription("Heidr : FOV SDAZ par m/s en sprint (flux optique constant)", new AcceptableValueRange<float>(0f, 3f)));
+            HeidrSprintFovMax = config.Bind(Camera, "HeidrSprintFovMax", 9f,
+                new ConfigDescription("Heidr : FOV SDAZ maximal en sprint", new AcceptableValueRange<float>(0f, 20f)));
+            HeidrInteriorHeight = config.Bind(Camera, "HeidrInteriorHeight", -0.55f,
+                new ConfigDescription("Heidr : hauteur à l'intérieur / au serré, relative aux yeux (torse ≈ -0.55, explo -0.4, tête ≈ 0)",
+                    new AcceptableValueRange<float>(-1.5f, 0.5f)));
+            HeidrIdleDelay = config.Bind(Camera, "HeidrIdleDelay", 8f,
+                new ConfigDescription("Heidr : secondes sans input avant la dérive mystique", new AcceptableValueRange<float>(2f, 60f)));
+            HeidrSway = config.Bind(Camera, "HeidrSway", 1f,
+                new ConfigDescription("Heidr : amplitude du souffle (dérive mystique, DOF). 0 = rigide", new AcceptableValueRange<float>(0f, 2f)));
+            HeidrDebug = config.Bind(Camera, "HeidrDebug", false,
+                "Heidr : overlay debug (état, owners par canal, zones Composer)");
             CinematicIdleEnabled = config.Bind(Camera, "CinematicIdleEnabled", true,
                 "Caméra cinématique après un temps sans input");
             CinematicIdleDelay = config.Bind(Camera, "CinematicIdleDelay", 60f,
                 new ConfigDescription("Secondes sans input avant la cinématique", new AcceptableValueRange<float>(10f, 300f)));
             CinematicSubjectRadius = config.Bind(Camera, "CinematicSubjectRadius", 40f,
                 new ConfigDescription("Rayon (m) pour trouver un PNJ, monstre ou animal comme sujet", new AcceptableValueRange<float>(10f, 150f)));
-            ToggleYoteiCamera = BindKey(config, Camera, "ToggleYoteiCamera", "Caméra : cycle Off -> Yotei -> AutoShoulder -> Seidr");
+            ToggleYoteiCamera = BindKey(config, Camera, "ToggleYoteiCamera", "Caméra : cycle Off -> Yotei -> AutoShoulder -> Seidr -> Heidr");
             ToggleCinematicIdle = BindKey(config, Camera, "ToggleCinematicIdle", "Activer/désactiver la caméra cinématique idle");
             StartCinematic = BindKey(config, Camera, "StartCinematic", "Lancer tout de suite un plan cinématique");
             SwapShoulder = BindKey(config, Camera, "SwapShoulder", "Forcer l'épaule gauche/droite (en AutoShoulder/Seidr, bloque l'auto ~6 s)");
@@ -274,6 +343,63 @@ namespace Qmod
             WolfRideSaddleHeight = config.Bind(Mounts, "WolfRideSaddleHeight", 0.85f,
                 new ConfigDescription("Hauteur du cavalier sur le dos du loup (m), appliquée en direct",
                     new AcceptableValueRange<float>(0.2f, 1.5f)));
+        }
+
+        private static void BindTransport(ConfigFile config)
+        {
+            WindsurfEnabled = config.Bind(Transport, "WindsurfEnabled", true,
+                "Planche à voile (proto) : clone du radeau avec un banc vanilla en guise de planche, posable au marteau sur l'eau. Prend effet au lancement");
+            WindsurfCloneBase = config.Bind(Transport, "WindsurfCloneBase", "Raft",
+                "Prefab bateau cloné pour la physique Ship (Raft, Karve ou VikingShip). Prend effet au lancement");
+            WindsurfBoardPrefab = config.Bind(Transport, "WindsurfBoardPrefab", "piece_bench01",
+                "Prefab vanilla utilisé comme planche (visuel seul). Replis automatiques puis cube bois si introuvable. Prend effet au lancement");
+            WindsurfHideHull = config.Bind(Transport, "WindsurfHideHull", true,
+                "Cache la coque du bateau cloné (mât, voile et gréement conservés). Prend effet au lancement");
+            WindsurfBoardScale = config.Bind(Transport, "WindsurfBoardScale", 1.6f,
+                new ConfigDescription("Échelle de la planche (banc agrandi, hero scale face aux vagues). Prend effet au lancement",
+                    new AcceptableValueRange<float>(0.5f, 3f)));
+            WindsurfBoardHeight = config.Bind(Transport, "WindsurfBoardHeight", 0.35f,
+                new ConfigDescription("Hauteur de la planche au-dessus du pont (m). Prend effet au lancement",
+                    new AcceptableValueRange<float>(-1f, 2f)));
+            WindsurfSailForce = config.Bind(Transport, "WindsurfSailForce", 0f,
+                new ConfigDescription("Coefficient de voile Ship.m_sailForceFactor. 0 = auto (drakkar x WindsurfSailFactor), sinon valeur absolue. Rechargé à chaud",
+                    new AcceptableValueRange<float>(0f, 30f)));
+            WindsurfSailFactor = config.Bind(Transport, "WindsurfSailFactor", 1.5f,
+                new ConfigDescription("Multiplicateur de voile vs drakkar en mode auto (WindsurfSailForce=0). Rechargé à chaud",
+                    new AcceptableValueRange<float>(0.5f, 5f)));
+            WindsurfDragFactor = config.Bind(Transport, "WindsurfDragFactor", 1f,
+                new ConfigDescription("Freinage eau vs drakkar. <1 = VMax plus haute, plus de glisse. Rechargé à chaud",
+                    new AcceptableValueRange<float>(0.1f, 2f)));
+            WindsurfHeelFactor = config.Bind(Transport, "WindsurfHeelFactor", 1f,
+                new ConfigDescription("Stabilité vs drakkar. <1 = tangue et roule plus (réalisme), trop bas = chavire. Rechargé à chaud",
+                    new AcceptableValueRange<float>(0.1f, 3f)));
+            WindsurfSpeedFactor = config.Bind(Transport, "WindsurfSpeedFactor", 1.5f,
+                new ConfigDescription("Plafond de vitesse vs drakkar. Rechargé à chaud",
+                    new AcceptableValueRange<float>(0.5f, 5f)));
+            WindsurfBalanceY = config.Bind(Transport, "WindsurfBalanceY", -0.1f,
+                new ConfigDescription("Hauteur du centre de masse (m, 0 = flottaison). Plus bas = stable, plus haut = joueur. Rechargé à chaud",
+                    new AcceptableValueRange<float>(-1f, 0.5f)));
+            WindsurfPivotZ = config.Bind(Transport, "WindsurfPivotZ", -0.5f,
+                new ConfigDescription("Position avant/arrière du pivot (m, négatif = arrière, sous le rider). Rechargé à chaud",
+                    new AcceptableValueRange<float>(-1.5f, 0.5f)));
+            WindsurfMaxPitch = config.Bind(Transport, "WindsurfMaxPitch", 18f,
+                new ConfigDescription("Butée de tangage (degrés, nez haut ou bas). Au-delà la planche est ramenée. Rechargé à chaud",
+                    new AcceptableValueRange<float>(5f, 80f)));
+            WindsurfMaxRoll = config.Bind(Transport, "WindsurfMaxRoll", 35f,
+                new ConfigDescription("Butée de gîte (degrés, sur les côtés). La voile cesse de pencher avant cette limite. Rechargé à chaud",
+                    new AcceptableValueRange<float>(5f, 80f)));
+            WindsurfSailForce.SettingChanged += OnWindsurfTuningChanged;
+            WindsurfSailFactor.SettingChanged += OnWindsurfTuningChanged;
+            WindsurfDragFactor.SettingChanged += OnWindsurfTuningChanged;
+            WindsurfHeelFactor.SettingChanged += OnWindsurfTuningChanged;
+            WindsurfSpeedFactor.SettingChanged += OnWindsurfTuningChanged;
+            WindsurfBalanceY.SettingChanged += OnWindsurfTuningChanged;
+            WindsurfPivotZ.SettingChanged += OnWindsurfTuningChanged;
+        }
+
+        private static void OnWindsurfTuningChanged(object sender, EventArgs e)
+        {
+            Windsurf.RefreshLiveTuning();
         }
 
         private static ConfigEntry<KeyboardShortcut> BindKey(ConfigFile config, string section, string name, string description)

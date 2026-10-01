@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace Qmod
 {
-    // Skip, sondes et input partagés par Yotei / AutoShoulder / Seidr / cinématique.
+    // Skip, sondes et input partagés par Yotei / AutoShoulder / Seidr / Heidr / cinématique.
     internal static class CameraUtil
     {
         internal const float ManualHoldSeconds = 6f;

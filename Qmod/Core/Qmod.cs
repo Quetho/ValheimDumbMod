@@ -12,7 +12,7 @@ namespace Qmod
     {
         public const string PluginGUID = "com.aeons.qmod";
         public const string PluginName = "Qmod";
-        public const string PluginVersion = "1.0.88";
+        public const string PluginVersion = "1.0.89";
 
         internal static Qmod Instance { get; private set; }
 
@@ -44,6 +44,7 @@ namespace Qmod
                 GUIManager.OnCustomGUIAvailable += ThorTp.OnGuiAvailable;
             }
 
+            PrefabManager.OnVanillaPrefabsAvailable += Windsurf.Register;
             Jotunn.Logger.LogInfo("Qmod has landed");
         }
 
@@ -84,6 +85,7 @@ namespace Qmod
             ThorLightning.ReadBinds(Config);
             WaterShader.Refresh();
             RadiusOverride.RefreshAll();
+            Windsurf.RefreshLiveTuning();
             Jotunn.Logger.LogInfo("Config Qmod rechargée");
         }
 
@@ -98,6 +100,7 @@ namespace Qmod
                 configWatcher = null;
             }
 
+            PrefabManager.OnVanillaPrefabsAvailable -= Windsurf.Register;
             if (!GUIManager.IsHeadless())
             {
                 GUIManager.OnCustomGUIAvailable -= ThorTp.OnGuiAvailable;

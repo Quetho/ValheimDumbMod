@@ -33,6 +33,11 @@ namespace Qmod
                 return;
             }
 
+            if (Input.GetKeyDown(KeyCode.O))
+            {
+                GiveBoardKit();
+            }
+
             if (Pressed(ModConfig.ToggleStatusHud))
             {
                 Toggle(ModConfig.StatusHudEnabled, "HUD effets");
@@ -150,6 +155,9 @@ namespace Qmod
                     next = ShoulderCameraMode.Seidr;
                     break;
                 case ShoulderCameraMode.Seidr:
+                    next = ShoulderCameraMode.Heidr;
+                    break;
+                case ShoulderCameraMode.Heidr:
                     next = ShoulderCameraMode.Off;
                     break;
                 default:
@@ -176,6 +184,10 @@ namespace Qmod
             {
                 SeidrCamera.ManualSwap();
             }
+            else if (ModConfig.CameraMode.Value == ShoulderCameraMode.Heidr)
+            {
+                HeidrCamera.ManualSwap();
+            }
             else if (ModConfig.CameraMode.Value == ShoulderCameraMode.Yotei)
             {
                 YoteiCamera.ManualSwap();
@@ -191,6 +203,36 @@ namespace Qmod
 
             entry.Value = !entry.Value;
             Jotunn.Logger.LogInfo(label + ": " + (entry.Value ? "on" : "off"));
+        }
+
+        // Kit pour poser la planche : établi (bois, pierre) + recette (cuir, résine).
+        private static void GiveBoardKit()
+        {
+            Player player = Util.AlivePlayer();
+            if (!player || player.GetInventory() == null || ObjectDB.instance == null)
+            {
+                return;
+            }
+
+            bool ok = Give(player, "Wood", 30)
+                && Give(player, "Stone", 10)
+                && Give(player, "LeatherScraps", 10)
+                && Give(player, "Resin", 10);
+            Util.NotifyPlayer(player, ok
+                ? "30 bois, 10 pierre, 10 cuir, 10 résine"
+                : "Inventaire plein, ou une ressource est introuvable");
+        }
+
+        private static bool Give(Player player, string name, int amount)
+        {
+            GameObject prefab = ObjectDB.instance.GetItemPrefab(name);
+            if (!prefab)
+            {
+                Jotunn.Logger.LogWarning("Kit planche: prefab introuvable " + name);
+                return false;
+            }
+
+            return player.GetInventory().AddItem(prefab, amount);
         }
     }
 }

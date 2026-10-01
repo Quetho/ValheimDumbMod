@@ -36,12 +36,17 @@ Requiert BepInEx et Jotunn (voir `manifest.json`).
   mains vides après un délai (options pour garder le crosshair et/ou
   l'endurance), stabilité de la pièce visée à droite du crosshair en
   mode build, Hugin (tutos) désactivé.
+- **Planche à voile (proto)** : clone du radeau avec un banc vanilla en
+  guise de planche, posable au marteau sur l'eau (section `7 - transport`).
+  Physique, voile, HUD et réseau 100 % vanilla.
 - **Caméra** : modes Yotei (épaule fixe + swap manuel), AutoShoulder
   (base Yotei + épaule auto gauche/droite : murs, déplacement, regard)
   et Seidr (contextuelle, réglages propres : cadrée large au combat,
   fougueuse au sprint, basse à la hanche à l'intérieur,
   mystique à l'arrêt — dérive lente, respiration, profondeur de champ,
-  secousses dosées sur roulade et atterrissage),
+  secousses dosées sur roulade et atterrissage)
+  et Heidr (prototype : Body + pin tête à zones dead/soft/hard,
+  table d'ownership par canal, overlay debug),
   recul en exploration et sprint, zoom combat, FOV dynamique, et caméra
   cinématique après inactivité (sujet joueur/PNJ, profondeur de champ).
 
