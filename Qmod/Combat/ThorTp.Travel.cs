@@ -176,6 +176,9 @@ namespace Qmod
                 body.linearVelocity = Vector3.zero;
                 body.angularVelocity = Vector3.zero;
             }
+
+            // Saut direct sans TeleportTo : la monture suit tout de suite.
+            RideCarry.FollowNow(player);
         }
 
         private static void FallbackBeside(Vector3 around, float theirYaw, out Vector3 dest, out float yaw)
@@ -316,7 +319,15 @@ namespace Qmod
                 return false;
             }
 
-            if (player.InBed() || player.IsAttached() || player.IsAttachedToShip())
+            if (player.InBed() || player.IsAttachedToShip())
+            {
+                return false;
+            }
+
+            // À dos de monture (Sadle : loup, Asksvin), le TP est autorisé :
+            // RideCarry fait suivre la monture. Le reste (lit, chaise, barre,
+            // baliste, buisson) reste bloqué.
+            if (player.IsAttached() && !(player.GetDoodadController() is Sadle))
             {
                 return false;
             }

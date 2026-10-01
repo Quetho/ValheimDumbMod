@@ -92,6 +92,7 @@ namespace Qmod
 
         internal static ConfigEntry<bool> WolfRideEnabled;
         internal static ConfigEntry<float> WolfRideSaddleHeight;
+        internal static ConfigEntry<bool> MountCarryEnabled;
 
         internal static ConfigEntry<bool> WindsurfEnabled;
         internal static ConfigEntry<string> WindsurfCloneBase;
@@ -343,6 +344,8 @@ namespace Qmod
             WolfRideSaddleHeight = config.Bind(Mounts, "WolfRideSaddleHeight", 0.85f,
                 new ConfigDescription("Hauteur du cavalier sur le dos du loup (m), appliquée en direct",
                     new AcceptableValueRange<float>(0.2f, 1.5f)));
+            MountCarryEnabled = config.Bind(Mounts, "MountCarryEnabled", true,
+                "Les montures à selle (loup, Asksvin) suivent le joueur dans les portails et TP, sans démonter");
         }
 
         private static void BindTransport(ConfigFile config)
