@@ -5,7 +5,7 @@ using UnityEngine;
 namespace Qmod
 {
     // Mode Heidr (prototype) : Composer + ownership, isolé de Seidr.
-    // Spec : research/camera/heidr.md (gitignoré). SeidrCamera.cs intact.
+    // Spec : research/camera/heidr.md (suivie en git). SeidrCamera.cs intact.
     //
     // Contenu du prototype :
     //   Body    : un module actif (Explo, Sprint ou Combat) sort un
@@ -34,8 +34,8 @@ namespace Qmod
     //   Épaule  : auto en explo (sondes + côté futur + warp vitesse),
     //             confirmation, gel combat / visée, hold 6 s après swap.
     //             Au mystic l'épaule est relâchée (marge plus large).
-    //   Prédiction : horizon = confirmation + 0,30 s, cap 5,5 m, pour
-    //             que le côté soit choisi ~0,3 s avant le mur.
+    //   Prédiction : horizon = confirmation + 0,30 s = 0,66 s,
+    //             cap 5,5 m, pour que le côté soit choisi avant le mur.
     //   Sprint  : recul selon la place derrière. FOV SDAZ selon la
     //             vitesse seule, borné, coupé dès la visée. Clavier
     //             on/off : les deux n'arment qu'après ~0,45 s de course
@@ -206,7 +206,7 @@ namespace Qmod
         private static bool probesReady;
         private static bool ceilingBlocked;
         private static float envProbeTimer;
-        private static float allowShoulder = 1.2f;
+        private static float debugPush;
         private static float smSoftPull;
         private static float velSoftPull;
         private static float smPush;
@@ -262,9 +262,11 @@ namespace Qmod
         private const float SprintSwapBlockAt = 0.4f;
 
         // La confirmation mange un lookahead trop court. L'horizon couvre
-        // le temps de confirmation plus le lead voulu avant le mur.
+        // le temps de confirmation plus le lead voulu avant le mur,
+        // soit 0,66 s (valeur spec, §5 de heidr.md).
         private const float PredictLead = 0.30f;
         private const float PredictCap = 5.5f;
+        private const float PredictHorizon = ShoulderConfirmTime + PredictLead;
         private const float SoftCorrSmooth = 0.08f;
         private const float SoftPullCap = 0.6f;
 
@@ -414,7 +416,7 @@ namespace Qmod
             punchPos = 0f;
             punchVel = 0f;
             ceilingBlocked = false;
-            allowShoulder = 1.2f;
+            debugPush = 0f;
             smSoftPull = 0f;
             velSoftPull = 0f;
             smPush = 0f;
@@ -554,7 +556,7 @@ namespace Qmod
 
                 Vector3 flatVel = player.GetVelocity();
                 flatVel.y = 0f;
-                float horizon = ShoulderConfirmTime + PredictLead;
+                float horizon = PredictHorizon;
                 Vector3 predShift = flatVel * horizon;
                 if (predShift.magnitude > PredictCap)
                 {
@@ -889,6 +891,23 @@ namespace Qmod
             }
         }
 
+        // Camera.main fait une recherche par tag : on la cache, re-fetch si
+        // la caméra a été détruite (changement de scène).
+        private static Camera mainCamera;
+
+        private static Camera MainCamera
+        {
+            get
+            {
+                if (!mainCamera)
+                {
+                    mainCamera = Camera.main;
+                }
+
+                return mainCamera;
+            }
+        }
+
         // Mesure la tête dans le cadre (pose de la frame précédente, retard
         // standard d'un Composer) et convertit l'écart en correction monde.
         // Signe négatif : parallaxe — caméra à droite = sujet à gauche du
@@ -897,7 +916,7 @@ namespace Qmod
         {
             latCorr = 0f;
             verCorr = 0f;
-            Camera main = Camera.main;
+            Camera main = MainCamera;
             if (!main || !player)
             {
                 return;
@@ -950,13 +969,13 @@ namespace Qmod
                     if (ModConfig.CameraMode != null && ModConfig.CameraMode.Value == ShoulderCameraMode.Heidr
                         && !CinematicIdleCamera.IsActive)
                     {
-                        ApplyShake(ref pos, ref rot);
+                        ApplyShake(__instance, ref pos, ref rot);
                     }
 
                     return;
                 }
 
-                ApplyShake(ref pos, ref rot);
+                ApplyShake(__instance, ref pos, ref rot);
                 KeepOutsideBody(player, ref pos);
             }
         }
@@ -1053,6 +1072,13 @@ namespace Qmod
             return LimitPush(pos, center + away * (minDist / dist));
         }
 
+        // Cache bouclier : GetComponentsInChildren alloue à chaque appel.
+        // L'instance ne change qu'à l'équipement ; les flags enabled sont
+        // relus à chaque frame sur les références cachées.
+        private static GameObject shieldCacheInstance;
+        private static Collider[] shieldCacheCols = new Collider[0];
+        private static Renderer[] shieldCacheRenderers = new Renderer[0];
+
         private static Vector3 PushOffInstance(Vector3 pos, GameObject instance, float minDist, Vector3 prefer)
         {
             if (!instance)
@@ -1060,7 +1086,14 @@ namespace Qmod
                 return pos;
             }
 
-            Collider[] cols = instance.GetComponentsInChildren<Collider>();
+            if (instance != shieldCacheInstance)
+            {
+                shieldCacheInstance = instance;
+                shieldCacheCols = instance.GetComponentsInChildren<Collider>();
+                shieldCacheRenderers = instance.GetComponentsInChildren<Renderer>();
+            }
+
+            Collider[] cols = shieldCacheCols;
             bool solid = false;
             for (int i = 0; i < cols.Length; i++)
             {
@@ -1079,7 +1112,7 @@ namespace Qmod
                 return pos;
             }
 
-            Renderer[] renderers = instance.GetComponentsInChildren<Renderer>();
+            Renderer[] renderers = shieldCacheRenderers;
             for (int i = 0; i < renderers.Length; i++)
             {
                 Renderer renderer = renderers[i];
@@ -1129,11 +1162,11 @@ namespace Qmod
         // plafonné anti-nausée. Roll et pitch ne s'écrivent que si la
         // table en donne la propriété ce frame (silence à l'arc, au menu,
         // et à mystic = 0).
-        private static void ApplyShake(ref Vector3 pos, ref Quaternion rot)
+        private static void ApplyShake(GameCamera camera, ref Vector3 pos, ref Quaternion rot)
         {
             Player player = Player.m_localPlayer;
             HeidrState state = ResolveState(player);
-            bool live = !ShouldSkip(GameCamera.instance, player);
+            bool live = !ShouldSkip(camera, player);
             bool allowRoll = live && OwnerOf(Channel.Roll, state) == Owner.Heidr;
             bool allowPitch = live && OwnerOf(Channel.Pitch, state) == Owner.Heidr && mysticBlend > 0.001f;
             if (!allowRoll && !allowPitch)
@@ -1204,13 +1237,19 @@ namespace Qmod
             {
                 Player player = Player.m_localPlayer;
                 GameCamera camera = GameCamera.instance;
+                if (ShouldSkip(camera, player))
+                {
+                    // Inactif : on rend le DOF (no-op si jamais capturé)
+                    // sans calculer de poids. Au switch de mode il reste
+                    // une frame d'ordre possible entre deux patchs.
+                    mysticDof.Restore(__instance);
+                    return;
+                }
+
                 float weight = MysticDofWeight();
                 debugDofW = weight;
                 HeidrState state = ResolveState(player);
-                bool ownsDof = !ShouldSkip(camera, player)
-                    && OwnerOf(Channel.Dof, state) == Owner.Heidr
-                    && weight >= 0.02f;
-                if (ownsDof)
+                if (OwnerOf(Channel.Dof, state) == Owner.Heidr && weight >= 0.02f)
                 {
                     ApplyMysticDof(__instance, player, weight);
                     return;
@@ -1225,7 +1264,7 @@ namespace Qmod
             float sway = ModConfig.HeidrSway != null ? Mathf.Clamp01(ModConfig.HeidrSway.Value) : 0f;
             float w = mysticBlend * sway * (1f - hipBlend);
             Player player = Player.m_localPlayer;
-            Camera main = Camera.main;
+            Camera main = MainCamera;
             if (main && player)
             {
                 w *= Mathf.Clamp01(Mathf.InverseLerp(1.2f, 3.5f, HeadDistance(player, main)));
@@ -1257,7 +1296,7 @@ namespace Qmod
                 return;
             }
 
-            Camera main = Camera.main;
+            Camera main = MainCamera;
             float dist = HeadDistance(player, main);
             float close = Mathf.Clamp01(Mathf.InverseLerp(3.5f, 1.2f, dist));
             float w = Mathf.Clamp01(weight);
@@ -1345,7 +1384,7 @@ namespace Qmod
 
         private static float NearRadius()
         {
-            Camera main = Camera.main;
+            Camera main = MainCamera;
             float near = main ? main.nearClipPlane : 0.3f;
             if (near < 0.05f || near > 2f)
             {
@@ -1482,7 +1521,7 @@ namespace Qmod
                 smSoftPull = 0f;
             }
 
-            allowShoulder = smPush;
+            debugPush = smPush;
             float pushSign = facing >= 0f ? -1f : 1f;
             return -dir * hardPull + right * pushSign * smPush - dir * smSoftPull;
         }
@@ -1659,7 +1698,7 @@ namespace Qmod
                     " G " + leftClear.ToString("F1") + ">" + leftFar.ToString("F1") +
                     " P " + ceilingClear.ToString("F1") + ">" + ceilingFar.ToString("F1") + (ceilingBlocked ? " (bas)" : "") + "\n" +
                     "corr hard " + debugHard.ToString("F2") + " soft " + smSoftPull.ToString("F2") +
-                    " push " + allowShoulder.ToString("F2") +
+                    " push " + debugPush.ToString("F2") +
                     " corps " + debugBody.ToString("F2") +
                     " punch " + punchPos.ToString("F2") +
                     " int " + interiorBlend.ToString("F2") + " mys " + mysticBlend.ToString("F2") + "\n" +
@@ -1673,7 +1712,7 @@ namespace Qmod
             // Zones Composer autour de l'ancrage + position tête.
             float dead = ModConfig.HeidrDeadZone != null ? ModConfig.HeidrDeadZone.Value : 0.1f;
             float soft = ModConfig.HeidrSoftZone != null ? Mathf.Max(ModConfig.HeidrSoftZone.Value, dead) : 0.2f;
-            Camera main = Camera.main;
+            Camera main = MainCamera;
             float aspect = main && main.aspect >= 0.1f ? main.aspect : 16f / 9f;
             DrawFrameRect(debugAnchor, dead / aspect, dead, Color.green);
             DrawFrameRect(debugAnchor, soft / aspect, soft, Color.yellow);
@@ -1760,15 +1799,18 @@ namespace Qmod
             EnsurePixel();
             Color saved = GUI.color;
             GUI.color = color;
-            if (Mathf.Abs(to.x - from.x) >= Mathf.Abs(to.y - from.y))
+            Vector2 delta = to - from;
+            float length = delta.magnitude;
+            if (length < 0.5f)
             {
-                float x0 = Mathf.Min(from.x, to.x);
-                GUI.DrawTexture(new Rect(x0, from.y - 1f, Mathf.Abs(to.x - from.x), 2f), overlayPixel);
+                GUI.DrawTexture(new Rect(from.x - 1f, from.y - 1f, 2f, 2f), overlayPixel);
             }
             else
             {
-                float y0 = Mathf.Min(from.y, to.y);
-                GUI.DrawTexture(new Rect(from.x - 1f, y0, 2f, Mathf.Abs(to.y - from.y)), overlayPixel);
+                Matrix4x4 matrix = GUI.matrix;
+                GUIUtility.RotateAroundPivot(Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg, from);
+                GUI.DrawTexture(new Rect(from.x, from.y - 1f, length, 2f), overlayPixel);
+                GUI.matrix = matrix;
             }
 
             GUI.color = saved;

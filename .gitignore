@@ -376,5 +376,8 @@ Environment.props
 */Package/plugins/*
 AGENTS.MD
 
-# notes de recherche locales (caméra, etc.)
-research/
+# notes de recherche locales (spec Heidr suivie, reste ignore)
+research/*
+!research/camera/
+research/camera/*
+!research/camera/heidr.md
