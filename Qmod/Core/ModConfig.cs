@@ -171,7 +171,7 @@ namespace Qmod
             CraftPullRadius = config.Bind(Options, "CraftPullRadius", 50f,
                 new ConfigDescription("Rayon (m) autour du joueur pour chercher les coffres", new AcceptableValueRange<float>(5f, 150f)));
             ChestDumpEnabled = config.Bind(Options, "ChestDumpEnabled", true,
-                "Bouton coffre au-dessus de l'armure (à droite de l'inventaire) et raccourci : range l'inventaire dans les coffres proches qui ne contiennent qu'une ressource et ont de la place. Rayon : CraftPullRadius");
+                "Bouton coffre au-dessus de l'armure (à droite de l'inventaire) et raccourci : range chaque ressource dans le coffre proche qui en contient le plus (même avec d'autres objets dedans), s'il reste de la place. Rayon : CraftPullRadius");
             ChestDump = BindKey(config, Options, "ChestDump", "Ranger l'inventaire dans les coffres mono-ressource proches");
         }
 

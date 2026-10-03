@@ -9,9 +9,10 @@ using UnityEngine.UI;
 namespace Qmod
 {
     // Raccourci et bouton (au-dessus de l'armure, à droite de l'inventaire) :
-    // range l'inventaire dans les coffres proches qui ne contiennent qu'un
-    // seul nom d'objet et qui ont encore de la place. Le plus proche d'abord.
-    // Le scan est celui du pull : mêmes coffres, même filtre de poseur.
+    // range chaque ressource dans le coffre proche qui en contient le plus,
+    // même s'il contient d'autres objets, s'il reste de la place (piles
+    // partielles puis slots vides). A stock égal, le plus proche gagne.
+    // Le scan est celui du pull : mêmes coffres, même filtre.
     // Le bouton scanne au survol (une fois) et passe au vert quand c'est prêt.
     // Le clic ne refait pas le scan : il envoie seulement l'écriture.
     internal static class ChestDump
@@ -47,7 +48,8 @@ namespace Qmod
         private static readonly List<ItemDrop.ItemData> playerStacks = new List<ItemDrop.ItemData>();
         private static readonly Dictionary<ItemDrop.ItemData, int> remaining = new Dictionary<ItemDrop.ItemData, int>();
         private static readonly Dictionary<long, int> partialRoom = new Dictionary<long, int>();
-        private static readonly HashSet<string> countedNames = new HashSet<string>();
+        private static readonly List<string> resNames = new List<string>();
+        private static readonly Dictionary<Container, int> chestEmpty = new Dictionary<Container, int>();
         private static readonly HashSet<Container> touched = new HashSet<Container>();
 
         internal static bool IsRunning()
@@ -311,7 +313,8 @@ namespace Qmod
             moves.Clear();
             targets.Clear();
             remaining.Clear();
-            countedNames.Clear();
+            resNames.Clear();
+            chestEmpty.Clear();
             playerStacks.Clear();
             wanted = 0;
             moved = 0;
@@ -353,17 +356,63 @@ namespace Qmod
                 }
             }
 
-            for (int c = 0; c < chests.Count; c++)
+            // Ressources distinctes de l'inventaire, ordre d'apparition.
+            for (int s = 0; s < playerStacks.Count; s++)
             {
-                Container container = chests[c];
-                Inventory chestInv = container.GetInventory();
-                string resName;
-                if (chestInv == null || chestInv == playerInv || !TryReadChest(chestInv, out resName))
+                string name = playerStacks[s].m_shared.m_name;
+                if (!resNames.Contains(name))
+                {
+                    resNames.Add(name);
+                }
+            }
+
+            // Chaque ressource part dans le coffre qui en contient le plus,
+            // quel que soit le reste de son contenu. Un coffre peut recevoir
+            // plusieurs ressources : les slots vides consommés sont partagés.
+            for (int r = 0; r < resNames.Count; r++)
+            {
+                string resName = resNames[r];
+                Container best = null;
+                Inventory bestInv = null;
+                int bestQty = 0;
+                for (int c = 0; c < chests.Count; c++)
+                {
+                    Container container = chests[c];
+                    if (!container)
+                    {
+                        continue;
+                    }
+
+                    Inventory chestInv = container.GetInventory();
+                    if (chestInv == null || chestInv == playerInv)
+                    {
+                        continue;
+                    }
+
+                    // Strictement supérieur : à stock égal le plus proche
+                    // gagne (chests est trié par distance).
+                    int qty = ChestStock(chestInv, resName);
+                    if (qty > bestQty)
+                    {
+                        best = container;
+                        bestInv = chestInv;
+                        bestQty = qty;
+                    }
+                }
+
+                // Aucun coffre ne contient la ressource : pas de rangement.
+                if (best == null || bestInv == null)
                 {
                     continue;
                 }
 
-                int empty = Mathf.Max(0, chestInv.GetEmptySlots());
+                ReadPartialRoom(bestInv, resName);
+                int empty;
+                if (!chestEmpty.TryGetValue(best, out empty))
+                {
+                    empty = Mathf.Max(0, bestInv.GetEmptySlots());
+                }
+
                 int chestTake = 0;
                 for (int s = 0; s < playerStacks.Count; s++)
                 {
@@ -414,25 +463,26 @@ namespace Qmod
                     remaining[stack] = leftAvailable - take;
                     moves.Add(new DumpMove
                     {
-                        Chest = container,
+                        Chest = best,
                         Stack = stack,
                         Amount = take
                     });
                     chestTake += take;
                 }
 
+                chestEmpty[best] = empty;
                 if (chestTake <= 0)
                 {
                     continue;
                 }
 
-                targets.Add(container);
-                if (countedNames.Add(resName))
+                if (!targets.Contains(best))
                 {
-                    wanted += UnequippedCount(resName);
+                    targets.Add(best);
                 }
 
-                Jotunn.Logger.LogInfo("ChestDump: " + resName + " -> " + Util.GetPrefabName(container.gameObject) + " x" + chestTake);
+                wanted += UnequippedCount(resName);
+                Jotunn.Logger.LogInfo("ChestDump: " + resName + " -> " + Util.GetPrefabName(best.gameObject) + " x" + chestTake + " (stock " + bestQty + ")");
             }
 
             Jotunn.Logger.LogInfo("ChestDump: " + chests.Count + " coffres, " + targets.Count + " cibles, " + moves.Count + " transferts, prévu " + SumMoves() + "/" + wanted + ", pas à toi=" + skippedOwner);
@@ -475,33 +525,36 @@ namespace Qmod
             return name.IndexOf("chest", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
-        // Un seul m_shared.m_name, et la place restante par qualité + world level
-        // (FindFreeStackItem n'empile que là-dessus). partialRoom est rempli pour l'appelant.
-        private static bool TryReadChest(Inventory inv, out string name)
+        // Stock brut d'une ressource dans un coffre (toutes qualités et niveaux
+        // de monde confondus) : sert à choisir le coffre qui en contient le plus.
+        private static int ChestStock(Inventory chestInv, string resName)
         {
-            name = null;
+            if (chestInv == null)
+            {
+                return 0;
+            }
+
+            return chestInv.CountItems(resName, -1, false);
+        }
+
+        // Place restante dans les piles partielles de la ressource (FindFreeStackItem
+        // n'empile que qualité + niveau de monde identiques). partialRoom est rempli
+        // pour l'appelant. Le reste du contenu du coffre est ignoré.
+        private static void ReadPartialRoom(Inventory inv, string resName)
+        {
             partialRoom.Clear();
             List<ItemDrop.ItemData> items = inv.GetAllItems();
-            if (items == null || items.Count == 0)
+            if (items == null)
             {
-                return false;
+                return;
             }
 
             for (int i = 0; i < items.Count; i++)
             {
                 ItemDrop.ItemData item = items[i];
-                if (item == null || item.m_shared == null || string.IsNullOrEmpty(item.m_shared.m_name))
+                if (item == null || item.m_shared == null || item.m_shared.m_name != resName)
                 {
-                    return false;
-                }
-
-                if (name == null)
-                {
-                    name = item.m_shared.m_name;
-                }
-                else if (item.m_shared.m_name != name)
-                {
-                    return false;
+                    continue;
                 }
 
                 int stackMax = item.m_shared.m_maxStackSize;
@@ -513,8 +566,6 @@ namespace Qmod
                     partialRoom[key] = room + (stackMax - item.m_stack);
                 }
             }
-
-            return name != null;
         }
 
         private static long StackKey(int quality, int worldLevel)
@@ -877,7 +928,7 @@ namespace Qmod
 
                     dumpTip.m_tooltipPrefab = tip.m_tooltipPrefab;
                     dumpTip.m_topic = "Ranger";
-                    dumpTip.m_text = "Survoler pour chercher les coffres. Vert = prêt, clic pour ranger. Rouge = sauvegarde du serveur. Seulement les coffres que tu as posés.";
+                    dumpTip.m_text = "Survoler pour chercher les coffres. Vert = prêt, clic pour ranger. Rouge = sauvegarde du serveur. Chaque ressource part dans le coffre (autorisé) qui en contient le plus.";
                     return true;
                 }
             }

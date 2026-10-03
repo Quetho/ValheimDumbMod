@@ -17,8 +17,10 @@ namespace Qmod
     // libre) sans rien toucher, puis transfert avec attente d'ownership
     // (indispensable côté client sur serveur dédié) et synchro ZDO.
     // Le scan (aussi utilisé par le marteau et le rangement) ne garde un
-    // coffre que s'il a été posé par le joueur. Poseur inconnu : refus si
-    // une balise active d'un autre joueur couvre le coffre.
+    // coffre que s'il a été posé par le joueur, ou s'il est couvert par
+    // une balise active de son propriétaire qui autorise le joueur.
+    // Poseur inconnu : refus si une balise où le joueur n'est ni
+    // propriétaire ni autorisé couvre le coffre.
     internal static class ChestPull
     {
         private const float OwnershipTimeout = 2f;
@@ -918,8 +920,9 @@ namespace Qmod
             return dest.Count;
         }
 
-        // Dernier scan : coffres écartés parce qu'un autre joueur les a posés,
-        // ou parce que le poseur est inconnu et qu'une balise étrangère couvre le point.
+        // Dernier scan : coffres écartés parce qu'un autre joueur les a posés
+        // sans balise de leur propriétaire autorisant le joueur, ou parce
+        // que le poseur est inconnu et qu'une balise non autorisée couvre le point.
         internal static int LastOwnerRejects;
 
         // Piece.m_creator est l'id du profil qui a posé la pièce (même id que
@@ -935,13 +938,61 @@ namespace Qmod
             long creator = piece ? piece.GetCreator() : 0L;
             if (creator != 0L)
             {
-                return creator == playerId;
+                if (creator == playerId)
+                {
+                    return true;
+                }
+
+                // Coffre d'un autre joueur : pull autorisé si une balise
+                // active de son propriétaire couvre le coffre et liste le
+                // joueur comme autorisé (IsPermitted = liste des autorisés,
+                // sans le propriétaire).
+                return WardPermitsPull(container.transform.position, creator, playerId);
             }
 
-            return !InsideForeignWard(container.transform.position, playerId);
+            return !InsideUnauthorizedWard(container.transform.position, playerId);
         }
 
-        private static bool InsideForeignWard(Vector3 point, long playerId)
+        // true s'il existe une balise active qui couvre le point, posée par
+        // le propriétaire du coffre, et dont le joueur fait partie des
+        // autorisés. Exiger une balise DU PROPRIÉTAIRE empêche le vol :
+        // poser sa propre balise sur les coffres d'autrui (ou être autorisé
+        // dans la balise d'un tiers) ne donne aucun droit sur leurs coffres.
+        private static bool WardPermitsPull(Vector3 point, long chestCreator, long playerId)
+        {
+            List<PrivateArea> areas = PrivateArea.m_allAreas;
+            if (areas == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < areas.Count; i++)
+            {
+                PrivateArea area = areas[i];
+                if (!area || !area.IsEnabled() || !area.IsInside(point, 0f))
+                {
+                    continue;
+                }
+
+                long wardOwner = area.m_piece ? area.m_piece.GetCreator() : 0L;
+                if (wardOwner == 0L || wardOwner != chestCreator)
+                {
+                    continue;
+                }
+
+                if (area.IsPermitted(playerId))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // Poseur inconnu (coffre du monde, ZDO pas encore lu) : le point est
+        // refusé dès qu'une balise active le couvre sans que le joueur en
+        // soit le propriétaire ou un autorisé.
+        private static bool InsideUnauthorizedWard(Vector3 point, long playerId)
         {
             List<PrivateArea> areas = PrivateArea.m_allAreas;
             if (areas == null)
@@ -958,10 +1009,12 @@ namespace Qmod
                 }
 
                 long owner = area.m_piece ? area.m_piece.GetCreator() : 0L;
-                if (owner != playerId)
+                if (owner == playerId || area.IsPermitted(playerId))
                 {
-                    return true;
+                    continue;
                 }
+
+                return true;
             }
 
             return false;

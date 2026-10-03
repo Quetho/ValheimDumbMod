@@ -24,10 +24,13 @@ Requiert BepInEx et Jotunn (voir `manifest.json`).
   proches (rayon réglable, défaut 50 m). Le pull du marteau reprend
   les mêmes coffres. Bouton coffre au-dessus de
   l'armure, à droite de l'inventaire (et raccourci), pour ranger
-  l'inventaire dans les coffres proches qui ne contiennent qu'une
-  ressource et ont de la place. Pull et rangement n'utilisent que les
-  coffres posés par le joueur ; un coffre sans poseur connu est ignoré
-  s'il est dans la zone d'une balise qui appartient à quelqu'un d'autre. Le transfert est bloqué 10 s avant
+  chaque ressource dans le coffre proche qui en contient le plus
+  (même avec d'autres objets dedans), s'il reste de la place. Pull
+  et rangement utilisent les coffres
+  posés par le joueur, plus ceux d'un autre joueur couverts par une balise
+  active de leur propriétaire qui autorise le joueur ; un coffre sans poseur
+  connu est ignoré s'il est dans la zone d'une balise où le joueur n'est ni
+  propriétaire ni autorisé. Le transfert est bloqué 10 s avant
   et 10 s après la sauvegarde serveur (bouton rouge). Le mode cultiver du cultivateur
   récolte les légumes prêts.
 - **Farming** : message configurable au kill sanglier avec le butcher knife,
